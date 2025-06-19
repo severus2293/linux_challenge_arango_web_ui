@@ -1,0 +1,11 @@
+ - Honour timeout and retries in randomReplace and randomUpdate and possibly
+   others
+ - Honour timeout and retries in graph insert vertices and edges
+ 
+ - Finish Grafana dashboards, upload to repository.
+
+ - Add a new graph type (random graph)
+ - Add graph traversal benchmark
+
+ - Fix testing code for larger graphs (blocked channels).
+ - Add histograms with execution times to metrics.

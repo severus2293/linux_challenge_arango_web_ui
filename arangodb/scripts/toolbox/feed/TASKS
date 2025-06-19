@@ -1,0 +1,13 @@
+In this document we collect tasks which need doing in this project.
+Let's put in brackets after the description the name of a person who
+grabs the task and starts working on it.
+
+ - Design graph traversal use cases. (Markus)
+
+ - Implement a job which creates a search view on a collection.
+ - Implement a random graph use case.
+ - Implement smart graph versions of the above.
+ - Implement a disjoint smart graph use case.
+ - Switch payloads to different sizes.
+ - ...
+

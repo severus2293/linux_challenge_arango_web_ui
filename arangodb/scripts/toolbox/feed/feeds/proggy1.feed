@@ -1,0 +1,13 @@
+# Comment
+
+[
+  {
+    wait 1
+    wait 2
+    wait 3
+  }
+  {
+    wait 4
+    wait 3
+  }
+]
