@@ -37,6 +37,7 @@ const ArangoError = require('@arangodb').ArangoError;
 const examples = require('@arangodb/graph-examples/example-graph');
 const createRouter = require('@arangodb/foxx/router');
 const users = require('@arangodb/users');
+const tasks = require('@arangodb/tasks');
 const cluster = require('@arangodb/cluster');
 const generalGraph = require('@arangodb/general-graph');
 const request = require('@arangodb/request');
@@ -47,6 +48,7 @@ const fs = require('fs');
 const _ = require('lodash');
 
 const ERROR_USER_NOT_FOUND = errors.ERROR_USER_NOT_FOUND.code;
+const ADMIN_TOKEN = process.env.ARANGO_ADMIN_TOKEN || 'arango_token';
 
 const router = createRouter();
 module.exports = router;
@@ -351,6 +353,55 @@ authRouter.post('/graph-examples/create/:name', function (req, res) {
 .description(dd`
   Create one of the given example graphs.
 `);
+
+
+function rand(prefix, len) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let s = '';
+  for (let i = 0; i < len; i++) {
+    s += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return prefix + s;
+}
+
+function isAdminToken(req,res){
+  const auth = (req.headers['authorization'] || '').trim();
+  if (!auth.startsWith('Bearer ')) {
+    return res.throw(401, 'Unauthorized: missing Bearer token');
+  }
+  const token = auth.slice(7);
+  if (token !== ADMIN_TOKEN) {
+    return res.throw(401, 'Unauthorized: invalid admin token');
+  }
+}
+
+router.get('/create_temp_db', function (req, res) {
+  try {
+    isAdminToken(req,res);
+    const dbName = rand('TEMP_', 12);
+    const username = rand('U_', 8);
+    const password = rand('', 12);
+
+    db._createDatabase(dbName);
+    users.save(username, password);
+    users.grantDatabase(username, dbName, 'rw');
+
+    const ttlSeconds = 600;
+    tasks.register({
+      offset: ttlSeconds,
+      command: `
+        const u = "${username}", d = "${dbName}";
+        require("@arangodb").db._dropDatabase(d);
+        require("@arangodb/users").remove(u);
+      `
+    });
+
+    res.send({ dbName, username, password});
+  } catch (err) {
+    res.throw(500, `Ошибка при создании временной БД: ${err.message}`);
+  }
+});
+
 
 authRouter.post('/job', function (req, res) {
   let frontend = db._collection('_frontend');
