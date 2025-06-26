@@ -19,8 +19,24 @@
     template: templateEngine.createTemplate('loginView.ejs'),
 
     render: function (loggedIn) {
+
       $(this.el).html(this.template.render({}));
 
+      const params = new URLSearchParams(window.location.search);
+       const u = params.get('username');
+       const p = params.get('password');
+       if (u) {
+         $('#loginUsername').val(u);
+       }
+       if (p) {
+         $('#loginPassword').val(p);
+       }
+       if (u && p) {
+         const fakeEvent = $.Event('submit');
+         fakeEvent.preventDefault();
+         this.validate(fakeEvent);
+         history.replaceState(null, '', window.location.pathname + window.location.hash);
+       }
       if (frontendConfig.isEnterprise) {
         $('#ArangoDBLogoVersion').text('Enterprise Edition');
         $('#ArangoDBLogoVersion').removeClass('enterprise');
@@ -259,6 +275,7 @@
             }
           });
         },
+
         error: (data) => {
           if (data.responseJSON && data.responseJSON.errorMessage) {
             $('#noAccess').html('Error (DB: ' + _.escape(database) + '): ' + _.escape(data.responseJSON.errorMessage));
