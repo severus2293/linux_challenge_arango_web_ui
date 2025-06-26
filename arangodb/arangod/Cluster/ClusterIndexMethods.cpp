@@ -504,8 +504,8 @@ Result dropIndexCoordinatorReplication2Inner(LogicalCollection const& col,
   }
   if (VPackSlice resultSlice = result.slice().get("results");
       resultSlice.length() > 0) {
-    Result r =
-        clusterInfo.waitForPlan(resultSlice[0].getNumber<uint64_t>()).get();
+    Result r = clusterInfo.waitForPlan(resultSlice[0].getNumber<uint64_t>())
+                   .waitAndGet();
     if (r.fail()) {
       return r;
     }
@@ -729,8 +729,8 @@ Result dropIndexCoordinatorInner(LogicalCollection const& col, IndexId iid,
   }
   if (VPackSlice resultSlice = result.slice().get("results");
       resultSlice.length() > 0) {
-    Result r =
-        clusterInfo.waitForPlan(resultSlice[0].getNumber<uint64_t>()).get();
+    Result r = clusterInfo.waitForPlan(resultSlice[0].getNumber<uint64_t>())
+                   .waitAndGet();
     if (r.fail()) {
       return r;
     }
@@ -796,7 +796,7 @@ auto ensureIndexCoordinatorReplication2Inner(
   VPackSlice indexes = collectionFromTarget.indexes();
   for (auto const& other : VPackArrayIterator(indexes)) {
     TRI_ASSERT(other.isObject());
-    if (arangodb::Index::Compare(engine, index, other,
+    if (arangodb::Index::compare(engine, index, other,
                                  collection.vocbase().name())) {
       VPackBuilder resultBuilder;
       {  // found an existing index... Copy over all elements in slice.
@@ -807,7 +807,7 @@ auto ensureIndexCoordinatorReplication2Inner(
       return resultBuilder;
     }
 
-    if (arangodb::Index::CompareIdentifiers(index, other)) {
+    if (arangodb::Index::compareIdentifiers(index, other)) {
       // found an existing index with a same identifier (i.e. name)
       // but different definition, throw an error
       return Result(TRI_ERROR_ARANGO_DUPLICATE_IDENTIFIER,
@@ -932,7 +932,7 @@ auto ensureIndexCoordinatorReplication2Inner(
               }
               return Result{};
             });
-    auto res = waitOnSuccess.get();
+    auto res = waitOnSuccess.waitAndGet();
     if (res.fail()) {
       // Try our best to drop the index again
       std::ignore =
@@ -1003,7 +1003,7 @@ Result ensureIndexCoordinatorInner(LogicalCollection const& collection,
   VPackSlice indexes = collectionFromPlan.indexes();
   for (auto const& other : VPackArrayIterator(indexes)) {
     TRI_ASSERT(other.isObject());
-    if (arangodb::Index::Compare(engine, slice, other,
+    if (arangodb::Index::compare(engine, slice, other,
                                  collection.vocbase().name())) {
       {  // found an existing index... Copy over all elements in slice.
         VPackObjectBuilder b(&resultBuilder);
@@ -1013,7 +1013,7 @@ Result ensureIndexCoordinatorInner(LogicalCollection const& collection,
       return Result(TRI_ERROR_NO_ERROR);
     }
 
-    if (arangodb::Index::CompareIdentifiers(slice, other)) {
+    if (arangodb::Index::compareIdentifiers(slice, other)) {
       // found an existing index with a same identifier (i.e. name)
       // but different definition, throw an error
 #ifdef ARANGODB_ENABLE_MAINTAINER_MODE
@@ -1146,8 +1146,8 @@ Result ensureIndexCoordinatorInner(LogicalCollection const& collection,
   if (result.successful()) {
     if (VPackSlice resultsSlice = result.slice().get("results");
         resultsSlice.length() > 0) {
-      Result r =
-          clusterInfo.waitForPlan(resultsSlice[0].getNumber<uint64_t>()).get();
+      Result r = clusterInfo.waitForPlan(resultsSlice[0].getNumber<uint64_t>())
+                     .waitAndGet();
       if (r.fail()) {
         return r;
       }
@@ -1262,7 +1262,7 @@ Result ensureIndexCoordinatorInner(LogicalCollection const& collection,
               resultsSlice.length() > 0) {
             Result r =
                 clusterInfo.waitForPlan(resultsSlice[0].getNumber<uint64_t>())
-                    .get();
+                    .waitAndGet();
             if (r.fail()) {
               return r;
             }
@@ -1312,7 +1312,7 @@ Result ensureIndexCoordinatorInner(LogicalCollection const& collection,
                 updateSlice.length() > 0) {
               Result r =
                   clusterInfo.waitForPlan(updateSlice[0].getNumber<uint64_t>())
-                      .get();
+                      .waitAndGet();
               if (r.fail()) {
                 return r;
               }

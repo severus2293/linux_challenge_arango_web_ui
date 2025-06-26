@@ -23,10 +23,10 @@
 
 #include "OptimizerRulesFeature.h"
 #include "ApplicationFeatures/ApplicationServer.h"
-#include "Aql/IResearchViewOptimizerRules.h"
-#include "Aql/IndexNodeOptimizerRules.h"
-#include "Aql/GraphOptimizerRules.h"
-#include "Aql/Optimizer/Rules/EnumeratePathsFilter/EnumeratePathsFilter.h"
+#include "Aql/Optimizer/Rule/EnumeratePathsFilter/EnumeratePathsFilter.h"
+#include "Aql/Optimizer/Rule/OptimizerRulesGraph.h"
+#include "Aql/Optimizer/Rule/OptimizerRulesIResearchView.h"
+#include "Aql/Optimizer/Rule/OptimizerRulesIndexNode.h"
 #include "Aql/OptimizerRules.h"
 #include "Basics/Exceptions.h"
 #include "Cluster/ServerState.h"
@@ -181,6 +181,13 @@ void OptimizerRulesFeature::addRules() {
   registerRule("replace-like-with-range", replaceLikeWithRangeRule,
                OptimizerRule::replaceLikeWithRange, OptimizerRule::makeFlags(),
                R"(Replace LIKE() function with range scans where possible.)");
+
+  registerRule(
+      "replace-entries-with-object-iteration",
+      replaceEntriesWithObjectIteration,
+      OptimizerRule::replaceEntriesWithObjectIteration,
+      OptimizerRule::makeFlags(OptimizerRule::Flags::CanBeDisabled),
+      R"(Replace FOR ... ENTRIES(obj) enumeration with proper object iteration.)");
 
   // inline subqueries one level higher
   registerRule("inline-subqueries", inlineSubqueriesRule,
@@ -387,6 +394,12 @@ evaluate to `true`.)");
                OptimizerRule::makeFlags(OptimizerRule::Flags::CanBeDisabled),
                R"(Use indexes to avoid `SORT` operations, removing `SortNode`
 from the query plan.)");
+
+  // try to merge an index scan and a collect statement
+  registerRule("use-index-for-collect", useIndexForCollect,
+               OptimizerRule::useIndexForCollectRule,
+               OptimizerRule::makeFlags(OptimizerRule::Flags::CanBeDisabled),
+               R"(Use indexes for a collect statement if appropriate.)");
 
   // sort in-values in filters (note: must come after
   // remove-filter-covered-by-index rule)
@@ -786,18 +799,39 @@ collection access or traversal, shortest path, or k-shortest paths query.)");
                R"(Try to read from the underlying collections of a View as late
 as possible if the involved attributes are covered by the View index.)");
 
-  // apply late materialization for index queries
+  // apply late materialization for inverted index queries.
+  // note: this rule is only used for inverted indexes but not for other
+  // index types
   registerRule("late-document-materialization", lateDocumentMaterializationRule,
                OptimizerRule::lateDocumentMaterializationRule,
                OptimizerRule::makeFlags(OptimizerRule::Flags::CanBeDisabled),
                R"(Try to read from collections as late as possible if the
-involved attributes are covered by regular indexes.)");
+involved attributes are covered by inverted indexes.)");
 
   // apply late materialization for index queries
   registerRule("batch-materialize-documents", batchMaterializeDocumentsRule,
                OptimizerRule::batchMaterializeDocumentsRule,
                OptimizerRule::makeFlags(OptimizerRule::Flags::CanBeDisabled),
                R"(Batch document lookup from indexes.)");
+
+  // push down materialization nodes to reduce the number of documents
+  registerRule("push-down-late-materialization",
+               pushDownLateMaterializationRule,
+               OptimizerRule::pushDownLateMaterialization,
+               OptimizerRule::makeFlags(OptimizerRule::Flags::CanBeDisabled),
+               R"(Push down late materialization.)");
+
+  registerRule("push-limit-into-index", pushLimitIntoIndexRule,
+               OptimizerRule::pushLimitIntoIndexRule,
+               OptimizerRule::makeFlags(OptimizerRule::Flags::CanBeDisabled),
+               R"(Push limit into index node.)");
+
+  registerRule("materialize-into-separate-variable",
+               materializeIntoSeparateVariable,
+               OptimizerRule::materializeIntoSeparateVariable,
+               // rule cannot be disabled because it is crucial for correctness
+               OptimizerRule::makeFlags(),
+               R"(Introduce a separate variable for late materialization.)");
 
 #ifdef USE_ENTERPRISE
   // apply late materialization for offset infos
@@ -809,6 +843,11 @@ involved attributes are covered by regular indexes.)");
                R"(Get the search highlighting offsets as late as possible to
 avoid unnecessary reads.)");
 #endif
+
+  registerRule("use-vector-index", useVectorIndexRule,
+               OptimizerRule::useVectorIndexForSort,
+               OptimizerRule::makeFlags(OptimizerRule::Flags::CanBeDisabled),
+               R"(Apply vector index.)");
 
   registerRule(
       "immutable-search-condition", iresearch::immutableSearchCondition,

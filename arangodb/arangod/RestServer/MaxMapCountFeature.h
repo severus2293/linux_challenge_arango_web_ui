@@ -24,7 +24,6 @@
 #pragma once
 
 #include "RestServer/arangod.h"
-#include "Basics/Common.h"
 
 namespace arangodb {
 
@@ -36,13 +35,7 @@ class MaxMapCountFeature final : public ArangodFeature {
 
   void collectOptions(std::shared_ptr<options::ProgramOptions>) override final;
 
-  static bool needsChecking() {
-#ifdef __linux__
-    return true;
-#else
-    return false;
-#endif
-  }
+  static bool needsChecking() { return true; }
 
   static uint64_t actualMaxMappings();
   static uint64_t minimumExpectedMaxMappings();

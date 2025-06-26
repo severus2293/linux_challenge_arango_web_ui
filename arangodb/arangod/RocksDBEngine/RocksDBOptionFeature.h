@@ -30,7 +30,6 @@
 #include <rocksdb/options.h>
 #include <rocksdb/table.h>
 
-#include "Basics/Common.h"
 #include "RestServer/arangod.h"
 #include "RocksDBEngine/RocksDBColumnFamilyManager.h"
 #include "RocksDBEngine/RocksDBOptionsProvider.h"
@@ -173,6 +172,7 @@ class RocksDBOptionFeature final : public ArangodFeature,
   bool _partitionFilesForEdgeIndexCf;
   bool _partitionFilesForVPackIndexCf;
   bool _partitionFilesForMdiIndexCf;
+  bool _partitionFilesForVectorIndexCf;
 
   /// per column family write buffer limits
   std::array<uint64_t, RocksDBColumnFamilyManager::numberOfColumnFamilies>

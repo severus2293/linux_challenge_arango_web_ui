@@ -1,4 +1,4 @@
-/* global print, progress, createCollectionSafe, db, createSafe, semver  */
+/* global print, progress, createCollectionSafe, db, createUseDatabaseSafe, semver , arango */
 
 (function () {
   return {
@@ -14,35 +14,21 @@
     },
     makeDataDB: function (options, isCluster, isEnterprise, database, dbCount) {
       // All items created must contain dbCount
-      print(`900: oneShard making per database data ${dbCount}`);
+      print(`${Date()} 900: oneShard making per database data ${dbCount}`);
       let baseName = database;
       if (baseName === "_system") {
         baseName = "system";
       }
       progress('Start create OneShard DB');
-      db._useDatabase("_system");
       print('#ix');
       const databaseName = `${baseName}_${dbCount}_oneShard`;
-      if (db._databases().includes(databaseName)) {
-        // its already there - skip this one.
-        print(`900: skipping ${databaseName} - its already there.`);
-        return 0;
+      const created = createUseDatabaseSafe(databaseName, {sharding: "single"});
+      if (db._properties().sharding !== "single") {
+        throw new Error(`900: created database ${databaseName} ==? ${arango.getDatabaseName()} isn't single shard: ${JSON.stringify(db._properties())}`);
       }
-      const created = createSafe(databaseName,
-                                 dbname => {
-                                   db._flushCache();
-                                   db._createDatabase(dbname, {sharding: "single"});
-                                   db._useDatabase(dbname);
-                                   return true;
-                                 }, dbname => {
-                                   db._useDatabase(dbname);
-                                   return db._properties().sharding === "single";
-                                 }
-                                );
       if (!created) {
         // its already wrongly there - skip this one.
-        print(`900: skipping ${databaseName} - it failed to be created, but it is no one-shard.`);
-        return 0;
+        throw new Error(`900: skipping ${databaseName} - it failed to be created, or it is not of type one-shard.`);
       }
       progress(`created OneShard DB '${databaseName}'`);
       for (let ccount = 0; ccount < options.collectionMultiplier; ++ccount) {
@@ -68,8 +54,7 @@
       }
       progress("Test OneShard setup");
       const databaseName = `${baseName}_${dbCount}_oneShard`;
-      print('900: oneshard vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv ' + databaseName);
-      print(db._databases());
+      print(`${Date()} 900: oneshard vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv ${databaseName}`);
       db._useDatabase(databaseName);
       for (let ccount = 0; ccount < options.collectionMultiplier; ++ccount) {
         const query = `
@@ -77,9 +62,15 @@
       FOR x IN c_${ccount}_1
         RETURN {v1: testee.value, v2: x.value}
       `;
-        const result = db._query(query).toArray();
+        let result;
+        try {
+          result = db._query(query).toArray();
+        } catch (ex) {
+          print(`${Date()} Failed to instanciate query ${query} -> ${ex}`);
+          throw ex;
+        }
         if (result.length !== 1 || result[0].v1 !== "success" || result[0].v2 !== "success") {
-          throw new Error("DOCUMENT call in OneShard database does not return data " + JSON.stringify(result));
+          throw new Error(`${Date()} 900: DOCUMENT call in OneShard database does not return data ${JSON.stringify(result)}`);
         }
       }
       db._useDatabase('_system');
@@ -87,7 +78,7 @@
     },
     clearDataDB: function (options, isCluster, isEnterprise, database, dbCount) {
       // check per DB
-      progress("900: Test OneShard teardown");
+      print(`${Date()} 900: Test OneShard teardown`);
       if (database === "_system") {
         database = "system";
       }

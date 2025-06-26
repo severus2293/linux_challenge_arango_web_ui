@@ -81,6 +81,9 @@ static int runServer(int argc, char** argv, ArangoGlobalContext& context) {
         []<typename T>(auto& server, TypeTag<T>) {
           return std::make_unique<T>(server);
         },
+        [](auto& server, TypeTag<async_registry::Feature>) {
+          return std::make_unique<async_registry::Feature>(server);
+        },
 #ifdef TRI_HAVE_GETRLIMIT
         [](auto& server, TypeTag<BumpFileDescriptorsFeature>) {
           return std::make_unique<BumpFileDescriptorsFeature>(
@@ -114,11 +117,21 @@ static int runServer(int argc, char** argv, ArangoGlobalContext& context) {
         [](auto& server, TypeTag<LoggerFeature>) {
           return std::make_unique<LoggerFeature>(server, true);
         },
+        [](auto& server, TypeTag<metrics::MetricsFeature>) {
+          return std::make_unique<metrics::MetricsFeature>(
+              server,
+              LazyApplicationFeatureReference<QueryRegistryFeature>(server),
+              LazyApplicationFeatureReference<StatisticsFeature>(server),
+              LazyApplicationFeatureReference<EngineSelectorFeature>(server),
+              LazyApplicationFeatureReference<metrics::ClusterMetricsFeature>(
+                  server),
+              LazyApplicationFeatureReference<ClusterFeature>(server));
+        },
         [](auto& server, TypeTag<NetworkFeature>) {
           auto& metrics =
               server.template getFeature<arangodb::metrics::MetricsFeature>();
           return std::make_unique<NetworkFeature>(
-              server, metrics, network::ConnectionPool::Config{metrics});
+              server, metrics, network::ConnectionPool::Config{});
         },
         [](auto& server, TypeTag<QueryRegistryFeature>) {
           return std::make_unique<QueryRegistryFeature>(
@@ -129,6 +142,9 @@ static int runServer(int argc, char** argv, ArangoGlobalContext& context) {
           return std::make_unique<ReplicationMetricsFeature>(
               server,
               server.template getFeature<arangodb::metrics::MetricsFeature>());
+        },
+        [](auto& server, TypeTag<VectorIndexFeature>) {
+          return std::make_unique<VectorIndexFeature>(server);
         },
         [](auto& server, TypeTag<RocksDBEngine>) {
           return std::make_unique<RocksDBEngine>(
@@ -215,8 +231,6 @@ static int runServer(int argc, char** argv, ArangoGlobalContext& context) {
   exit(EXIT_FAILURE);
 }
 
-#ifdef __linux__
-
 // The following is a hack which is currently (September 2019) needed to
 // let our static executables compiled with libmusl and gcc 8.3.0 properly
 // detect that we are a multi-threaded application.
@@ -235,15 +249,12 @@ static void f() {
   static pthread_once_t once_control = PTHREAD_ONCE_INIT;
   pthread_once(&once_control, gg);
 }
-#endif
 
 int main(int argc, char* argv[]) {
-#ifdef __linux__
   // Do not delete this! See above for an explanation.
   if (argc >= 1 && strcmp(argv[0], "not a/valid name") == 0) {
     f();
   }
-#endif
 
   std::string workdir(arangodb::basics::FileUtils::currentDirectory().result());
 
@@ -275,7 +286,6 @@ int main(int argc, char* argv[]) {
   // so the process does not have to be terminated. On Windows, we have
   // to do this because the solution below is not possible. In these
   // cases, we need outside help to get the process restarted.
-#if defined(__linux__) || defined(__APPLE__)
   res = chdir(workdir.c_str());
   if (res != 0) {
     std::cerr << "WARNING: could not change into directory '" << workdir << "'"
@@ -285,5 +295,4 @@ int main(int argc, char* argv[]) {
     std::cerr << "WARNING: could not execvp ourselves, restore will not work!"
               << std::endl;
   }
-#endif
 }

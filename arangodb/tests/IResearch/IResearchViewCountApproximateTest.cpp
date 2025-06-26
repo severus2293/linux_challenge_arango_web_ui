@@ -24,10 +24,10 @@
 #include "IResearchQueryCommon.h"
 #include "Aql/AqlCall.h"
 #include "Aql/ExecutionBlockImpl.h"
+#include "Aql/ExecutionNode/IResearchViewNode.h"
 #include "Aql/ExecutionPlan.h"
-#include "Aql/IResearchViewNode.h"
-#include "Aql/IResearchViewExecutor.h"
-#include "Aql/OptimizerRulesFeature.h"
+#include "Aql/Executor/IResearchViewExecutor.h"
+#include "Aql/Executor/IResearchViewMergeExecutor.h"
 #include "Aql/Query.h"
 #include "Aql/SingleRowFetcher.h"
 #include "Basics/GlobalResourceMonitor.h"
@@ -246,8 +246,9 @@ class IResearchViewCountApproximateTest : public IResearchQueryTest {
     arangodb::velocypack::Builder builder;
 
     builder.openObject();
-    view->properties(builder,
-                     arangodb::LogicalDataSource::Serialization::Properties);
+    auto res = view->properties(
+        builder, arangodb::LogicalDataSource::Serialization::Properties);
+    ASSERT_TRUE(res.ok());
     builder.close();
 
     auto slice = builder.slice();

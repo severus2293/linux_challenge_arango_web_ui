@@ -25,8 +25,8 @@
 
 #include "Aql/AqlValue.h"
 #include "Aql/DocumentExpressionContext.h"
-#include "Aql/EnumerateCollectionExecutor.h"
-#include "Aql/IndexExecutor.h"
+#include "Aql/Executor/EnumerateCollectionExecutor.h"
+#include "Aql/Executor/IndexExecutor.h"
 #include "Aql/LateMaterializedExpressionContext.h"
 #include "Aql/OutputAqlItemRow.h"
 #include "Aql/Projections.h"
@@ -678,6 +678,7 @@ IndexIterator::CoveringCallback aql::getCallback(
 
           return false;
         };
+        context.incrLookups();
         context.getPhysical().lookup(
             context.getTrxPtr(), token, cb,
             {.readOwnWrites = static_cast<bool>(context.getReadOwnWrites()),

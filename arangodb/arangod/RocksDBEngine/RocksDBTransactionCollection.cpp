@@ -213,6 +213,19 @@ void RocksDBTransactionCollection::commitCounts(TransactionId trxId,
                                                 uint64_t commitSeq) {
   TRI_IF_FAILURE("DisableCommitCounts") { return; }
   TRI_ASSERT(_collection != nullptr);
+  if (_collection == nullptr) {
+    // This was observed once in production. We currently do not know how
+    // this can happen, since no code path should lead to this. We add this
+    // provision here to avoid a crash in case this happens again and we
+    // put out additional information to the log to be able to get to the
+    // bottom of this:
+    LOG_TOPIC("54241", ERR, arangodb::Logger::ENGINES)
+        << "commitCounts: _collcetion is nullptr, trxId=" << trxId
+        << ", commitSeq=" << commitSeq << ", usageLocked=" << _usageLocked
+        << ", collection id: " << id().id();
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
+                                   "commitCounts: _collection is nullptr");
+  }
   auto* rcoll = static_cast<RocksDBMetaCollection*>(_collection->getPhysical());
 
   // Update the collection count
@@ -234,8 +247,12 @@ void RocksDBTransactionCollection::commitCounts(TransactionId trxId,
     rcoll->meta().adjustNumberDocuments(commitSeq, _revision, adj);
   }
 
-  // update the revision tree
-  if (!_trackedOperations.empty()) {
+  bool const hasTrackedOps = !_trackedOperations.empty();
+  // update the revision tree. this is only relevant if the collection uses
+  // Merkle trees.
+  if (hasTrackedOps) {
+    TRI_ASSERT(hasOperations());
+    TRI_ASSERT(hasTrackedOps);
     rcoll->bufferUpdates(commitSeq, std::move(_trackedOperations.inserts),
                          std::move(_trackedOperations.removals));
   }
@@ -258,8 +275,7 @@ void RocksDBTransactionCollection::commitCounts(TransactionId trxId,
     }
   }
 
-  if (hasOperations() || !_trackedOperations.empty() ||
-      !_trackedIndexOperations.empty()) {
+  if (hasOperations() || hasTrackedOps || !_trackedIndexOperations.empty()) {
     rcoll->removeRevisionTreeBlocker(trxId);
   }
 
@@ -372,13 +388,18 @@ futures::Future<Result> RocksDBTransactionCollection::doLock(
     // acquired the lock ourselves
     res.reset(TRI_ERROR_LOCKED);
   } else if (res.is(TRI_ERROR_LOCK_TIMEOUT) && timeout >= 0.1) {
-    std::string message =
+    res.reset(
+        TRI_ERROR_LOCK_TIMEOUT,
         absl::StrCat("timed out after ", timeout, " s waiting for ",
                      AccessMode::typeString(type), "-lock on collection ",
                      _transaction->vocbase().name(), "/", _collection->name(),
-                     " on ", _transaction->actorName());
-    LOG_TOPIC("4512c", WARN, Logger::QUERIES) << message;
-    res.reset(TRI_ERROR_LOCK_TIMEOUT, std::move(message));
+                     " on ", _transaction->actorName()));
+    if (timeout <= 5.0) {
+      // low timeout, does not justify a warning message
+      LOG_TOPIC("2111a", DEBUG, Logger::QUERIES) << res.errorMessage();
+    } else {
+      LOG_TOPIC("4512c", WARN, Logger::QUERIES) << res.errorMessage();
+    }
 
     // increase counter for lock timeouts
     auto& stats = _transaction->statistics();

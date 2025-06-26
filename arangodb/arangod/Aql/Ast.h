@@ -134,7 +134,9 @@ class Ast {
   bool isInSubQuery() const noexcept;
 
   /// @brief return a copy of our own bind parameters
-  std::unordered_set<std::string> bindParameters() const;
+  std::unordered_set<std::string> bindParameterNames() const;
+
+  BindParameterVariableMapping bindParameterVariables() const;
 
   /// @brief get the query scopes
   Scopes* scopes();
@@ -156,6 +158,13 @@ class Ast {
   void setContainsParallelNode() noexcept;
   bool containsAsyncPrefetch() const noexcept;
   void setContainsAsyncPrefetch() noexcept;
+  bool containsBindParameters() const noexcept;
+  bool containsAttributeNameValueBindParameters() const noexcept;
+  bool containsCollectionNameValueBindParameters() const noexcept;
+  bool containsGraphNameValueBindParameters() const noexcept;
+  void setContainsGraphNameValueBindParameters() noexcept;
+  bool containsTraversalDepthValueBindParameters() const noexcept;
+  bool containsUpsertLookupValueBindParameters() const noexcept;
 
   bool canApplyParallelism() const noexcept {
     return _containsParallelNode && !_willUseV8 && !_containsModificationNode;
@@ -393,6 +402,9 @@ class Ast {
   /// @brief create an AST calculated object element node
   AstNode* createNodeCalculatedObjectElement(AstNode const*, AstNode const*);
 
+  /// @brief create an AST destructuring node
+  AstNode* createNodeDestructuring(AstNode const* value, bool isObject);
+
   /// @brief create an AST with collections node
   AstNode* createNodeWithCollections(AstNode const*,
                                      CollectionNameResolver const& resolver);
@@ -446,9 +458,23 @@ class Ast {
   /// @brief create an AST n-ary operator
   AstNode* createNodeNaryOperator(AstNodeType, AstNode const*);
 
-  /// @brief injects bind parameters into the AST
-  void injectBindParameters(BindParameters& parameters,
-                            CollectionNameResolver const& resolver);
+  /// @brief injects first-stage bind parameter values into the AST
+  /// (i.e. collection bind parameters and bound attribute names,
+  /// e.g. @@foo and `doc.@attr`).
+  void injectBindParametersFirstStage(BindParameters& parameters,
+                                      CollectionNameResolver const& resolver);
+
+  /// @brief injects second-stage bind parameter values into the AST
+  /// (i.e. all value bind parameters)
+  void injectBindParametersSecondStage(BindParameters& parameters);
+
+  /// @brief replaces bind parameters with special variables. This is used
+  /// for query plan caching.
+  void replaceBindParametersWithVariables(BindParameters& parameters);
+
+  /// @brief replaces bind parameters with special variables. This is used
+  /// for query plan caching.
+  void replaceBindParametersWithValues(BindParameters& parameters);
 
   /// @brief replace variables
   ///        the unlock parameter will unlock the variable node before it
@@ -507,19 +533,24 @@ class Ast {
   AstNode const* deduplicateArray(AstNode const*);
 
   /// @brief check if an operator is reversible
-  static bool IsReversibleOperator(AstNodeType);
+  static bool isReversibleOperator(AstNodeType) noexcept;
 
-  /// @brief get the reversed operator for a comparison operator
-  static AstNodeType ReverseOperator(AstNodeType);
+  /// @brief get the reversed operator for a comparison operator.
+  /// throws when called for an operator that is not reversible.
+  static AstNodeType reverseOperator(AstNodeType type);
 
-  /// @brief get the n-ary operator type equivalent for a binary operator type
-  static AstNodeType NaryOperatorType(AstNodeType);
+  /// throws when called for an operator that is not negatable.
+  static AstNodeType negateOperator(AstNodeType type);
+
+  /// @brief get the n-ary operator type equivalent for a binary operator type.
+  /// throws when called for an invalid operator type.
+  static AstNodeType naryOperatorType(AstNodeType);
 
   /// @brief return whether this is an `AND` operator
-  static bool IsAndOperatorType(AstNodeType);
+  static bool isAndOperatorType(AstNodeType type) noexcept;
 
   /// @brief return whether this is an `OR` operator
-  static bool IsOrOperatorType(AstNodeType);
+  static bool isOrOperatorType(AstNodeType type) noexcept;
 
   /// @brief create an AST node from vpack
   AstNode* nodeFromVPack(velocypack::Slice, bool copyStringValues);
@@ -541,7 +572,37 @@ class Ast {
 
   AstNode const* getSubqueryForVariable(Variable const* variable) const;
 
+  /** Make sure to replace the AstNode* you pass into TraverseAndModify
+   *  if it was changed. This is necessary because the function itself
+   *  has only access to the node but not its parent / owner.
+   */
+  /// @brief traverse the AST, using pre- and post-order visitors
+  static AstNode* traverseAndModify(AstNode*,
+                                    std::function<bool(AstNode const*)> const&,
+                                    std::function<AstNode*(AstNode*)> const&,
+                                    std::function<void(AstNode const*)> const&);
+
+  /// @brief traverse the AST using a depth-first visitor
+  static AstNode* traverseAndModify(AstNode*,
+                                    std::function<AstNode*(AstNode*)> const&);
+
+  /// @brief traverse the AST, using pre- and post-order visitors
+  static void traverseReadOnly(AstNode const*,
+                               std::function<bool(AstNode const*)> const&,
+                               std::function<void(AstNode const*)> const&);
+
+  /// @brief traverse the AST using a depth-first visitor, with const nodes
+  static void traverseReadOnly(AstNode const*,
+                               std::function<void(AstNode const*)> const&);
+
+  /// @brief normalize a function name
+  static std::pair<std::string, bool> normalizeFunctionName(
+      std::string_view name);
+
  private:
+  /// @brief replace a bind parameter with its value equivalent.
+  AstNode* replaceValueBindParameter(AstNode* node, BindParameters& parameters);
+
   /// @brief make condition from example
   AstNode* makeConditionFromExample(AstNode const*);
 
@@ -597,35 +658,6 @@ class Ast {
   /// @brief optimizes an object literal or an object expression
   AstNode* optimizeObject(AstNode*);
 
- public:
-  /** Make sure to replace the AstNode* you pass into TraverseAndModify
-   *  if it was changed. This is necessary because the function itself
-   *  has only access to the node but not its parent / owner.
-   */
-  /// @brief traverse the AST, using pre- and post-order visitors
-  static AstNode* traverseAndModify(AstNode*,
-                                    std::function<bool(AstNode const*)> const&,
-                                    std::function<AstNode*(AstNode*)> const&,
-                                    std::function<void(AstNode const*)> const&);
-
-  /// @brief traverse the AST using a depth-first visitor
-  static AstNode* traverseAndModify(AstNode*,
-                                    std::function<AstNode*(AstNode*)> const&);
-
-  /// @brief traverse the AST, using pre- and post-order visitors
-  static void traverseReadOnly(AstNode const*,
-                               std::function<bool(AstNode const*)> const&,
-                               std::function<void(AstNode const*)> const&);
-
-  /// @brief traverse the AST using a depth-first visitor, with const nodes
-  static void traverseReadOnly(AstNode const*,
-                               std::function<void(AstNode const*)> const&);
-
-  /// @brief normalize a function name
-  static std::pair<std::string, bool> normalizeFunctionName(
-      std::string_view name);
-
- private:
   /// @brief create a node of the specified type
   AstNode* createNode(AstNodeType);
 
@@ -638,7 +670,8 @@ class Ast {
   AstNode* createNodeCollectionNoValidation(std::string_view name,
                                             AccessMode::Type accessType);
 
-  void extractCollectionsFromGraph(AstNode const* graphNode);
+  void extractCollectionsFromGraph(BindParameters& parameter,
+                                   AstNode* graphNode);
 
   /// @brief copies node payload from node into copy. this is *not* copying
   /// the subnodes
@@ -648,14 +681,6 @@ class Ast {
     return ((_astFlags & static_cast<decltype(_astFlags)>(flag)) != 0);
   }
 
- public:
-  /// @brief negated comparison operators
-  static std::unordered_map<int, AstNodeType> const NegatedOperators;
-
-  /// @brief reverse comparison operators
-  static std::unordered_map<int, AstNodeType> const ReversedOperators;
-
- private:
   /// @brief the query
   QueryContext& _query;
 
@@ -694,6 +719,31 @@ class Ast {
 
   /// @brief whether or not the query contains bind parameters
   bool _containsBindParameters;
+
+  /// @brief whether or not the query contains attribute name bind parameters
+  /// (e.g. doc.@attributeName)
+  bool _containsAttributeNameValueBindParameters;
+
+  /// @brief contains collection names in _value_ bind parameters
+  /// (e.g. "@collection") instead of collection name bind parameters
+  /// (e.g. "@@collection"). if the AST contains collection names in
+  /// value bind parameters, we cannot use the query plan cache for
+  /// this query.
+  bool _containsCollectionNameValueBindParameters;
+
+  /// @brief contains a graph name as a value bind parameter, e.g.
+  /// `FOR v, e IN 1..3 OUTBOUND start GRAPH @graph. if the AST contains
+  /// graph names like this, we cannot use the query plan cache for
+  /// this query.
+  bool _containsGraphNameValueBindParameters;
+
+  /// @brief contains traversal depth expressed via value bind parameters,
+  /// e.g. `FOR v, e IN @min .. @max ...`.
+  bool _containsTraversalDepthValueBindParameters;
+
+  /// @brief contains upsert lookup value expressed via a value bind parameter,
+  /// e.g. UPSERT @lookup ...
+  bool _containsUpsertLookupValueBindParameters;
 
   /// @brief contains INSERT / UPDATE / REPLACE / REMOVE / UPSERT
   bool _containsModificationNode;
@@ -741,6 +791,9 @@ class Ast {
 
   /// @brief ast flags
   AstPropertiesFlagsType _astFlags;
+
+  /// @brief variables that bind parameters were replaced with
+  BindParameterVariableMapping _bindParameterVariables;
 };
 
 }  // namespace aql

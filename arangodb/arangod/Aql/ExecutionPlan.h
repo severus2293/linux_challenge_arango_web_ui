@@ -23,25 +23,31 @@
 
 #pragma once
 
-#include <array>
-
 #include "Aql/CollectOptions.h"
-#include "Aql/ExecutionNode.h"
+#include "Aql/ExecutionNode/ExecutionNode.h"
 #include "Aql/ExecutionNodeId.h"
+#include "Aql/IndexHint.h"
 #include "Aql/ModificationOptions.h"
 #include "Aql/RegisterPlan.h"
+#include "Aql/SortElement.h"
 #include "Aql/types.h"
-#include "Basics/Common.h"
 #include "Containers/FlatHashMap.h"
 #include "Containers/HashSet.h"
 #include "Containers/SmallVector.h"
 
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
 #include <string_view>
+#include <unordered_set>
 
 namespace arangodb {
 namespace velocypack {
+class Builder;
 class Slice;
-}
+}  // namespace velocypack
 
 namespace aql {
 class Ast;
@@ -52,6 +58,7 @@ class Collections;
 class ExecutionNode;
 struct OptimizerRule;
 class QueryContext;
+class SubqueryNode;
 
 class ExecutionPlan {
  public:
@@ -77,17 +84,21 @@ class ExecutionPlan {
       Ast*, bool trackMemoryUsage);
 
   /// @brief process the list of collections in a VelocyPack
-  static void getCollectionsFromVelocyPack(aql::Collections&,
-                                           arangodb::velocypack::Slice const);
+  static void getCollectionsFromVelocyPack(aql::Collections& colls,
+                                           velocypack::Slice slice);
+
+  /// @brief process the list of collections in a VelocyPack
+  static void extendCollectionsByViewsFromVelocyPack(aql::Collections& colls,
+                                                     velocypack::Slice slice);
 
   /// @brief create an execution plan from VelocyPack
   static std::unique_ptr<ExecutionPlan> instantiateFromVelocyPack(
-      Ast* ast, arangodb::velocypack::Slice const);
+      Ast* ast, velocypack::Slice slice, bool simpleSnippetFormat);
 
   /// @brief whether or not the exclusive flag is set in the write options
   static bool hasExclusiveAccessOption(AstNode const* node);
 
-  std::unique_ptr<ExecutionPlan> clone(Ast*);
+  std::unique_ptr<ExecutionPlan> clone(Ast* ast);
 
   /// @brief clone the plan by recursively cloning starting from the root
   std::unique_ptr<ExecutionPlan> clone();
@@ -97,20 +108,21 @@ class ExecutionPlan {
                                           bool explainRegisters) noexcept;
 
   /// @brief export to VelocyPack
-  void toVelocyPack(arangodb::velocypack::Builder&, Ast* ast,
-                    unsigned flags) const;
+  void toVelocyPack(velocypack::Builder& builder, unsigned flags,
+                    std::function<void(velocypack::Builder&)> const&
+                        serializeQueryData) const;
 
   /// @brief check if the plan is empty
-  bool empty() const { return (_root == nullptr); }
+  bool empty() const noexcept { return (_root == nullptr); }
 
   /// @brief note that an optimizer rule was applied
   void addAppliedRule(int level);
 
   /// @brief check if a specific optimizer rule was applied
-  bool hasAppliedRule(int level) const;
+  bool hasAppliedRule(int level) const noexcept;
 
   /// @brief check if a specific rule is disabled
-  bool isDisabledRule(int rule) const;
+  bool isDisabledRule(int rule) const noexcept;
 
   bool hasForcedIndexHints() const noexcept { return _hasForcedIndexHints; }
 
@@ -119,6 +131,17 @@ class ExecutionPlan {
 
   /// @brief disable a specific rule
   void disableRule(int rule);
+
+  /// @brief increase number of async prefetch nodes
+  void increaseAsyncPrefetchNodes() noexcept;
+  /// @brief decrease number of async prefetch nodes
+  void decreaseAsyncPrefetchNodes() noexcept;
+
+  size_t asyncPrefetchNodes() const noexcept;
+
+  /// @brief returns the first unsatisfied forced index hint, if
+  /// one exists. otherwise returns an empty index hint
+  IndexHint firstUnsatisfiedForcedIndexHint() const;
 
   /// @brief return the next value for a node id
   ExecutionNodeId nextId();
@@ -130,10 +153,12 @@ class ExecutionPlan {
       const;
 
   /// @brief check if the node is the root node
-  bool isRoot(ExecutionNode const* node) const { return _root == node; }
+  bool isRoot(ExecutionNode const* node) const noexcept {
+    return _root == node;
+  }
 
   /// @brief get the root node
-  ExecutionNode* root() const {
+  ExecutionNode* root() const noexcept {
     TRI_ASSERT(_root != nullptr);
     return _root;
   }
@@ -163,7 +188,7 @@ class ExecutionPlan {
 
   /// @brief this can be called by the optimizer to tell that the
   /// plan is temporarily in an invalid state
-  void setValidity(bool value) { _planValid = value; }
+  void setValidity(bool value) noexcept { _planValid = value; }
 
 /// @brief show an overview over the plan
 #ifdef ARANGODB_ENABLE_MAINTAINER_MODE
@@ -177,8 +202,7 @@ class ExecutionPlan {
   }
 
   bool shouldExcludeFromScatterGather(ExecutionNode const* node) const {
-    return (_excludeFromScatterGather.find(node) !=
-            _excludeFromScatterGather.end());
+    return _excludeFromScatterGather.contains(node);
   }
 
   /// @brief get the node where variable with id <id> is introduced . . .
@@ -193,18 +217,18 @@ class ExecutionPlan {
 
   /// @brief find nodes of a certain type
   void findNodesOfType(containers::SmallVector<ExecutionNode*, 8>& result,
-                       ExecutionNode::NodeType, bool enterSubqueries);
+                       ExecutionNode::NodeType, bool enterSubqueries) const;
 
   /// @brief find nodes of certain types
   void findNodesOfType(containers::SmallVector<ExecutionNode*, 8>& result,
                        std::initializer_list<ExecutionNode::NodeType> const&,
-                       bool enterSubqueries);
+                       bool enterSubqueries) const;
 
   /// @brief find unique nodes of certain types
   void findUniqueNodesOfType(
       containers::SmallVector<ExecutionNode*, 8>& result,
       std::initializer_list<ExecutionNode::NodeType> const&,
-      bool enterSubqueries);
+      bool enterSubqueries) const;
 
   /// @brief find all end nodes in a plan
   void findEndNodes(containers::SmallVector<ExecutionNode*, 8>& result,
@@ -217,10 +241,10 @@ class ExecutionPlan {
   bool varUsageComputed() const;
 
   /// @brief determine if the above are already set
-  void setVarUsageComputed() { _varUsageComputed = true; }
+  void setVarUsageComputed() noexcept { _varUsageComputed = true; }
 
   /// @brief flush var usage calculation
-  void clearVarUsageComputed() { _varUsageComputed = false; }
+  void clearVarUsageComputed() noexcept { _varUsageComputed = false; }
 
   /// @brief static analysis
   void planRegisters(ExplainRegisterPlan = ExplainRegisterPlan::No);
@@ -274,7 +298,7 @@ class ExecutionPlan {
   void insertBefore(ExecutionNode* current, ExecutionNode* newNode);
 
   /// @brief get ast
-  Ast* getAst() const { return _ast; }
+  Ast* getAst() const noexcept { return _ast; }
 
   /// @brief resolves a variable alias, e.g. fn(tmp) -> "a.b" for the following:
   ///  LET tmp = a.b
@@ -287,8 +311,11 @@ class ExecutionPlan {
   /// @brief create an execution plan from an abstract syntax tree node
   ExecutionNode* fromNode(AstNode const*);
 
-  /// @brief create an execution plan from VPack
-  ExecutionNode* fromSlice(velocypack::Slice const& slice);
+  /// @brief create an execution plan from VPack.
+  /// if simpleSnippetFormat is true, then the slice is expected to be an
+  /// array of nodes. if simpleSnippetFormat is false, then the slice is
+  /// expected to be an object with a "nodes" array.
+  ExecutionNode* fromSlice(velocypack::Slice slice, bool simpleSnippetFormat);
 
   /// @brief whether or not the plan contains at least one node of this type
   bool contains(ExecutionNode::NodeType) const;
@@ -314,7 +341,7 @@ class ExecutionPlan {
   /// @brief find nodes of certain types
   void findNodesOfType(containers::SmallVector<ExecutionNode*, 8>& result,
                        std::initializer_list<ExecutionNode::NodeType> const&,
-                       bool enterSubqueries);
+                       bool enterSubqueries) const;
 
   /// @brief creates a calculation node
   ExecutionNode* createCalculation(Variable*, AstNode const*, ExecutionNode*);
@@ -397,7 +424,6 @@ class ExecutionPlan {
   std::vector<AggregateVarInfo> prepareAggregateVars(ExecutionNode** previous,
                                                      AstNode const* node);
 
- private:
   /// @brief map from node id to the actual node
   std::unordered_map<ExecutionNodeId, ExecutionNode*> _ids;
 
@@ -411,7 +437,7 @@ class ExecutionPlan {
   std::vector<int> _appliedRules;
 
   /// @brief which optimizer rules were disabled for a plan
-  ::arangodb::containers::HashSet<int> _disabledRules;
+  containers::HashSet<int> _disabledRules;
 
   /// @brief whether or not memory usage should be tracked for this plan.
   /// note: tracking memory usage requires accessing the Ast/Query objects,
@@ -450,6 +476,8 @@ class ExecutionPlan {
 
   /// @brief number of nodes used in the plan, by type
   std::array<uint32_t, ExecutionNode::MAX_NODE_TYPE_VALUE> _typeCounts;
+
+  size_t _asyncPrefetchNodes;
 };
 
 }  // namespace aql

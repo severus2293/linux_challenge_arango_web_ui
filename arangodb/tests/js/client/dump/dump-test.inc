@@ -1,5 +1,5 @@
 /*jshint globalstrict:false, strict:false, maxlen:4000 */
-/*global fail, assertEqual, assertNotEqual, assertTrue, assertFalse, assertNull, assertTypeOf, assertUndefined, arango */
+/*global fail, assertEqual, assertNotEqual, assertTrue, assertFalse, assertNull, assertTypeOf, assertUndefined, arango, print */
 
 // //////////////////////////////////////////////////////////////////////////////
 // / DISCLAIMER
@@ -39,6 +39,12 @@
   const isEnterprise = internal.isEnterprise();
   const instanceInfo = JSON.parse(require('internal').env.INSTANCEINFO);
   var db = internal.db;
+  const getNoShards = function (defaultNo) {
+    if (db._properties().sharding === "single") {
+      return 1;
+    }
+    return defaultNo;
+  };
 
   const getDumpDir = () => {
     let dumpDir = instanceInfo.rootDir;
@@ -67,7 +73,8 @@
     let collDistribution = {};
     let collDistributionPlan = {};
     let collDistributionCurrent = {};
-    const numSecsLimit = 16;
+    const isCov = require("@arangodb/test-helper").versionHas('coverage');
+    const numSecsLimit = (isCov)? 80:16;
     while (true) {
       const dbName = db._name();
       const res = db._connection.GET("/_db/" + dbName + "/_admin/cluster/shardDistribution");
@@ -89,7 +96,7 @@
       internal.sleep(numSecs);
       numSecs *= 2;
     }
-    assertTrue(numSecs < numSecsLimit, "reached timeout waited for collection " + collName + " to get in sync");
+    assertTrue(numSecs < numSecsLimit, `reached timeout waited for collection ${collName} to get in sync - ${numSecs} < ${numSecsLimit}`);
   }
 
   const extendedName = "Десятую Международную Конференцию по 💩🍺🌧t⛈c🌩_⚡🔥💥🌨";
@@ -353,7 +360,7 @@
         assertEqual(2, c.type()); // document
         assertTrue(p.waitForSync);
 
-        const indexes = c.getIndexes();
+        const indexes = c.indexes();
 
         assertEqual(args.emptyIndexes, indexes.length, `Found indexes: ${JSON.stringify(indexes)}`); // just primary index
         assertEqual("primary", indexes[0].type);
@@ -371,8 +378,8 @@
         assertEqual(2, c.type()); // document
         assertFalse(p.waitForSync);
 
-        assertEqual(args.manyIndexes, c.getIndexes().length, `We found following indexes: ${JSON.stringify(c.getIndexes())}`); // just primary index
-        assertEqual("primary", c.getIndexes()[0].type);
+        assertEqual(args.manyIndexes, c.indexes().length, `We found following indexes: ${JSON.stringify(c.indexes())}`); // just primary index
+        assertEqual("primary", c.indexes()[0].type);
         assertEqual(100000, c.count());
 
         // test all documents
@@ -407,12 +414,12 @@
         assertEqual(3, c.type()); // edges
         assertFalse(p.waitForSync);
 
-        assertEqual(args.edgesIndexCount,  c.getIndexes().length, `We found following indexes: ${JSON.stringify(c.getIndexes())}`); // primary index + edges index
-        assertEqual("primary", c.getIndexes()[0].type);
-        assertEqual("edge", c.getIndexes()[1].type);
+        assertEqual(args.edgesIndexCount, c.indexes().length, `We found following indexes: ${JSON.stringify(c.indexes())}`); // primary index + edges index
+        assertEqual("primary", c.indexes()[0].type);
+        assertEqual("edge", c.indexes()[1].type);
         if (args.edgesIndexCount > 2) {
           // Backup and restore:
-          assertEqual("hash", c.getIndexes()[2].type);
+          assertEqual("hash", c.indexes()[2].type);
         }
         assertEqual(10, c.count());
 
@@ -439,8 +446,8 @@
         assertEqual(2, c.type()); // document
         assertFalse(p.waitForSync);
 
-        assertEqual(1,  c.getIndexes().length, `We found following indexes: ${JSON.stringify(c.getIndexes())}`); // just primary index
-        assertEqual("primary", c.getIndexes()[0].type);
+        assertEqual(1, c.indexes().length, `We found following indexes: ${JSON.stringify(c.indexes())}`); // just primary index
+        assertEqual("primary", c.indexes()[0].type);
         assertEqual(3, c.count());
       },
 
@@ -455,8 +462,8 @@
         assertEqual(2, c.type()); // document
         assertFalse(p.waitForSync);
 
-        assertEqual(args.removedSingleIndices,  c.getIndexes().length, `We found following indexes: ${JSON.stringify(c.getIndexes())}`); // just primary index
-        assertEqual("primary", c.getIndexes()[0].type);
+        assertEqual(args.removedSingleIndices, c.indexes().length, `We found following indexes: ${JSON.stringify(c.indexes())}`); // just primary index
+        assertEqual("primary", c.indexes()[0].type);
         assertEqual(args.removedCount, c.count());
 
         for (let i = 0; i < 10000; ++i) {
@@ -484,8 +491,8 @@
         assertEqual(2, c.type()); // document
         assertFalse(p.waitForSync);
 
-        assertEqual(1,  c.getIndexes().length, `We found following indexes: ${JSON.stringify(c.getIndexes())}`); // just primary index
-        assertEqual("primary", c.getIndexes()[0].type);
+        assertEqual(1, c.indexes().length, `We found following indexes: ${JSON.stringify(c.indexes())}`); // just primary index
+        assertEqual("primary", c.indexes()[0].type);
         assertEqual(10000, c.count());
 
         for (let i = 0; i < 10000; ++i) {
@@ -505,51 +512,51 @@
         assertEqual(2, c.type()); // document
         assertFalse(p.waitForSync);
 
-        assertEqual(args.indexesCount,  c.getIndexes().length, `We found following indexes: ${JSON.stringify(c.getIndexes())}`);
-        assertEqual("primary", c.getIndexes()[0].type);
+        assertEqual(args.indexesCount, c.indexes().length, `We found following indexes: ${JSON.stringify(c.indexes())}`);
+        assertEqual("primary", c.indexes()[0].type);
 
-        assertEqual("hash", c.getIndexes()[1].type);
-        assertTrue(c.getIndexes()[1].unique);
-        assertFalse(c.getIndexes()[1].sparse);
-        assertEqual(["a_uc"], c.getIndexes()[1].fields);
+        assertEqual("hash", c.indexes()[1].type);
+        assertTrue(c.indexes()[1].unique);
+        assertFalse(c.indexes()[1].sparse);
+        assertEqual(["a_uc"], c.indexes()[1].fields);
 
-        assertEqual("skiplist", c.getIndexes()[2].type);
-        assertFalse(c.getIndexes()[2].unique);
-        assertFalse(c.getIndexes()[2].sparse);
-        assertEqual(["a_s1", "a_s2"], c.getIndexes()[2].fields);
+        assertEqual("skiplist", c.indexes()[2].type);
+        assertFalse(c.indexes()[2].unique);
+        assertFalse(c.indexes()[2].sparse);
+        assertEqual(["a_s1", "a_s2"], c.indexes()[2].fields);
 
-        assertEqual("hash", c.getIndexes()[3].type);
-        assertFalse(c.getIndexes()[3].unique);
-        assertFalse(c.getIndexes()[3].sparse);
-        assertEqual(["a_h1", "a_h2"], c.getIndexes()[3].fields);
+        assertEqual("hash", c.indexes()[3].type);
+        assertFalse(c.indexes()[3].unique);
+        assertFalse(c.indexes()[3].sparse);
+        assertEqual(["a_h1", "a_h2"], c.indexes()[3].fields);
 
-        assertEqual("skiplist", c.getIndexes()[4].type);
-        assertTrue(c.getIndexes()[4].unique);
-        assertFalse(c.getIndexes()[4].sparse);
-        assertEqual(["a_su"], c.getIndexes()[4].fields);
+        assertEqual("skiplist", c.indexes()[4].type);
+        assertTrue(c.indexes()[4].unique);
+        assertFalse(c.indexes()[4].sparse);
+        assertEqual(["a_su"], c.indexes()[4].fields);
 
-        assertEqual("hash", c.getIndexes()[5].type);
-        assertFalse(c.getIndexes()[5].unique);
-        assertTrue(c.getIndexes()[5].sparse);
-        assertEqual(["a_hs1", "a_hs2"], c.getIndexes()[5].fields);
+        assertEqual("hash", c.indexes()[5].type);
+        assertFalse(c.indexes()[5].unique);
+        assertTrue(c.indexes()[5].sparse);
+        assertEqual(["a_hs1", "a_hs2"], c.indexes()[5].fields);
 
-        assertEqual("skiplist", c.getIndexes()[6].type);
-        assertFalse(c.getIndexes()[6].unique);
-        assertTrue(c.getIndexes()[6].sparse);
-        assertEqual(["a_ss1", "a_ss2"], c.getIndexes()[6].fields);
+        assertEqual("skiplist", c.indexes()[6].type);
+        assertFalse(c.indexes()[6].unique);
+        assertTrue(c.indexes()[6].sparse);
+        assertEqual(["a_ss1", "a_ss2"], c.indexes()[6].fields);
 
-        assertFalse(c.getIndexes()[7].unique);
-        assertEqual("fulltext", c.getIndexes()[7].type);
-        assertEqual(["a_f"], c.getIndexes()[7].fields);
+        assertFalse(c.indexes()[7].unique);
+        assertEqual("fulltext", c.indexes()[7].type);
+        assertEqual(["a_f"], c.indexes()[7].fields);
 
-        assertEqual("geo", c.getIndexes()[8].type);
-        assertEqual(["a_la", "a_lo"], c.getIndexes()[8].fields);
-        assertFalse(c.getIndexes()[8].unique);
+        assertEqual("geo", c.indexes()[8].type);
+        assertEqual(["a_la", "a_lo"], c.indexes()[8].fields);
+        assertFalse(c.indexes()[8].unique);
 
         if (args.indexesCount > 9) {
-          assertEqual("hash", c.getIndexes()[9].type);
-          assertEqual(["abc"], c.getIndexes()[9].fields);
-          assertFalse(c.getIndexes()[9].unique);
+          assertEqual("hash", c.indexes()[9].type);
+          assertEqual(["abc"], c.indexes()[9].fields);
+          assertFalse(c.indexes()[9].unique);
         }
         assertEqual(0, c.count());
       },
@@ -565,8 +572,8 @@
         assertEqual(2, c.type()); // document
         assertFalse(p.waitForSync);
 
-        assertEqual(1,  c.getIndexes().length, `We found following indexes: ${JSON.stringify(c.getIndexes())}`); // just primary index
-        assertEqual("primary", c.getIndexes()[0].type);
+        assertEqual(1, c.indexes().length, `We found following indexes: ${JSON.stringify(c.indexes())}`); // just primary index
+        assertEqual("primary", c.indexes()[0].type);
         assertEqual(0, c.count());
       },
 
@@ -580,10 +587,10 @@
 
         assertEqual(2, c.type()); // document
         assertFalse(p.waitForSync);
-        assertEqual(9, p.numberOfShards);
+        assertEqual(getNoShards(9), p.numberOfShards);
 
-        assertEqual(1,  c.getIndexes().length, `We found following indexes: ${JSON.stringify(c.getIndexes())}`); // just primary index
-        assertEqual("primary", c.getIndexes()[0].type);
+        assertEqual(1, c.indexes().length, `We found following indexes: ${JSON.stringify(c.indexes())}`); // just primary index
+        assertEqual("primary", c.indexes()[0].type);
         assertEqual(1000, c.count());
 
         for (let i = 0; i < 1000; ++i) {
@@ -635,8 +642,8 @@
         assertEqual(7, p.keyOptions.offset);
         assertEqual(42, p.keyOptions.increment);
 
-        assertEqual(1,  c.getIndexes().length, `We found following indexes: ${JSON.stringify(c.getIndexes())}`); // just primary index
-        assertEqual("primary", c.getIndexes()[0].type);
+        assertEqual(1, c.indexes().length, `We found following indexes: ${JSON.stringify(c.indexes())}`); // just primary index
+        assertEqual("primary", c.indexes()[0].type);
         assertEqual(args.autoIncDocCount, c.count());
 
         for (var i = 0; i < 1000; ++i) {
@@ -676,8 +683,8 @@
         assertFalse(p.waitForSync);
         assertEqual("padded", p.keyOptions.type);
         assertFalse(p.keyOptions.allowUserKeys);
-        assertEqual(1,  c.getIndexes().length, `We found following indexes: ${JSON.stringify(c.getIndexes())}`); // just primary index
-        assertEqual("primary", c.getIndexes()[0].type);
+        assertEqual(1,  c.indexes().length, `We found following indexes: ${JSON.stringify(c.indexes())}`); // just primary index
+        assertEqual("primary", c.indexes()[0].type);
         assertEqual(args.paddedDocCount, c.count());
 
         let allDocs = {};
@@ -727,8 +734,8 @@
         assertEqual("uuid", p.keyOptions.type);
         assertFalse(p.keyOptions.allowUserKeys);
 
-        assertEqual(1, c.getIndexes().length, `We found following indexes: ${JSON.stringify(c.getIndexes())}`); // just primary index
-        assertEqual("primary", c.getIndexes()[0].type);
+        assertEqual(1, c.indexes().length, `We found following indexes: ${JSON.stringify(c.indexes())}`); // just primary index
+        assertEqual("primary", c.indexes()[0].type);
         assertEqual(args.uuidDocCount, c.count());
 
         let allDocs = {};
@@ -759,8 +766,8 @@
         assertEqual(2, c.type()); // document
         assertFalse(p.waitForSync);
 
-        assertEqual(1, c.getIndexes().length, `We found following indexes: ${JSON.stringify(c.getIndexes())}`); // just primary index
-        assertEqual("primary", c.getIndexes()[0].type);
+        assertEqual(1, c.indexes().length, `We found following indexes: ${JSON.stringify(c.indexes())}`); // just primary index
+        assertEqual("primary", c.indexes()[0].type);
         assertEqual(8, c.count());
 
         var texts = [
@@ -842,9 +849,9 @@
         var c = getCollection("UnitTestsDumpPersistent");
         var p = c.properties();
 
-        assertEqual(2, c.getIndexes().length, `We found following indexes: ${JSON.stringify(c.getIndexes())}`);
-        assertEqual("primary", c.getIndexes()[0].type);
-        assertEqual("persistent", c.getIndexes()[1].type);
+        assertEqual(2, c.indexes().length, `We found following indexes: ${JSON.stringify(c.indexes())}`);
+        assertEqual("primary", c.indexes()[0].type);
+        assertEqual("persistent", c.indexes()[1].type);
         assertEqual(10000, c.count());
 
         var res = db._query("FOR doc IN " + c.name() + " FILTER doc.value >= 0 RETURN doc").toArray();
@@ -955,7 +962,7 @@
         let figures;
         for (let i = 0; i < 100; ++i) {
           require("internal").sleep(0.5);
-          figures = collection.getIndexes(true, true)
+          figures = collection.indexes(true, true)
             .find(e => e.name === "searchIndex")
             .figures;
           if (figures.numDocs > 5000) {
@@ -1068,13 +1075,13 @@
         let p = c.properties();
 
         assertEqual(2, p.replicationFactor);
-        assertEqual(7, p.numberOfShards);
+        assertEqual(getNoShards(7), p.numberOfShards);
 
         c = getCollection("UnitTestsDumpReplicationFactor2");
         p = c.properties();
 
         assertEqual(2, p.replicationFactor);
-        assertEqual(6, p.numberOfShards);
+        assertEqual(getNoShards(6), p.numberOfShards);
       },
 
       testSatelliteGraph: function () {
@@ -1206,7 +1213,7 @@
         let c = getCollection(vertices);
         let p = c.properties();
         assertEqual(2, c.type()); // Document
-        assertEqual(5, p.numberOfShards);
+        assertEqual(getNoShards(5), p.numberOfShards);
         assertTrue(p.isSmart, p);
         assertEqual(100, c.count());
         assertEqual("value", p.smartGraphAttribute);
@@ -1262,7 +1269,7 @@
         let c = getCollection(orphans);
         let p = c.properties();
         assertEqual(2, c.type()); // Document
-        assertEqual(5, p.numberOfShards);
+        assertEqual(getNoShards(5), p.numberOfShards);
         assertTrue(p.isSmart);
         assertEqual(100, c.count());
         assertEqual("value", p.smartGraphAttribute);
@@ -1319,7 +1326,7 @@
         let c = getCollection(edges);
         let p = c.properties();
         assertEqual(3, c.type()); // Edges
-        //assertEqual(5, p.numberOfShards);
+        //assertEqual(getNoShards(5), p.numberOfShards);
         assertTrue(p.isSmart);
         assertEqual(300, c.count());
       },
@@ -1451,6 +1458,10 @@
       },
 
       testSmartGraphSharding: function () {
+        if (db._properties().sharding === "single") {
+          print("Skipping testSmartGraphSharding for oneshard db");
+          return 0;
+        }
         const eCol = getCollection(edges);
         const eProp = eCol.properties();
         const vCol = getCollection(vertices);
@@ -1464,8 +1475,8 @@
         if (oProp.hasOwnProperty("distributeShardsLike")) {
           // The Vertex collection is selected as leading.
           assertFalse(Object.hasOwnProperty(vProp, "distributeShardsLike"));
-          assertEqual(vertices, eProp.distributeShardsLike);
-          assertEqual(vertices, oProp.distributeShardsLike);
+          assertEqual(vertices, eProp.distributeShardsLike, `Not equal: ${JSON.stringify(vertices)} !~= ${JSON.stringify(eProp)}`);
+          assertEqual(vertices, oProp.distributeShardsLike, `Not equal: ${JSON.stringify(vertices)} !~= ${JSON.stringify(eProp)}`);
         } else {
           // The orphan collection is selected as leading.
           assertFalse(Object.hasOwnProperty(oProp, "distributeShardsLike"));
@@ -1561,6 +1572,40 @@
         assertCommonSmartGraphProperties(graph);
         assertEqual(graph.edgeDefinitions.length, 0);
         assertEqual(graph.orphanCollections.length, 0);
+      },
+
+      testSmartGraph3_11_compat: function () {
+        if (!isEnterprise) {
+          return;
+        }
+        const smartGraphName = "UnitTestDumpSmartGraphCompat";
+        const graphsColl = getCollection('_graphs');
+        assertTrue(!!graphsColl.exists(smartGraphName));
+
+        const graphDoc = graphsColl.document(smartGraphName);
+        // This is the requirement to test if the compat cid has effect
+        // We test this here as the setup for this graph should fake an
+        // old version graph, so we can test that the values existence
+        // does not have negative impact on the restore.
+        assertTrue(graphDoc.hasOwnProperty('initialCid'));
+        // Now let us try to modify the GraphRelations
+        const newRelationName = `${smartGraphName}NewEdge`;
+        const newVertexName = `${smartGraphName}NewVertex`;
+        const newRelation = gm._relation(newRelationName,
+          "UnitTestDumpSmartVerticesCompat",
+          newVertexName
+        );
+        // New collections do not yet exist, that would be forbidden.
+        assertEqual(db._collections().filter(c => c.name() === newRelationName).length, 0);
+        assertEqual(db._collections().filter(c => c.name() === newVertexName).length, 0);
+        const graph = gm._graph(smartGraphName);
+        graph._extendEdgeDefinitions(newRelation);
+        // New collections are added
+        assertEqual(db._collections().filter(c => c.name() === newRelationName).length, 1);
+        assertEqual(db._collections().filter(c => c.name() === newVertexName).length, 1);
+        // New collections are smart
+        assertTrue(db[newRelationName].properties().isSmart);
+        assertTrue(db[newVertexName].properties().isSmart);
       },
 
       testEmptyEnterpriseGraph: function () {

@@ -24,12 +24,13 @@
 #pragma once
 
 #include "RestServer/arangod.h"
-#include "Scheduler/Scheduler.h"
 
 #include <functional>
 #include <memory>
 
 namespace arangodb {
+
+class Scheduler;
 
 class SchedulerFeature final : public ArangodFeature {
  public:
@@ -61,13 +62,13 @@ class SchedulerFeature final : public ArangodFeature {
 
   uint64_t _nrMinimalThreads = 4;
   uint64_t _nrMaximalThreads = 0;
-  uint64_t _nrMaximalDetachedThreads = 1000;
   uint64_t _queueSize = 4096;
   uint64_t _fifo1Size = 4096;
   uint64_t _fifo2Size = 4096;
   uint64_t _fifo3Size = 4096;
   double _ongoingLowPriorityMultiplier = 4.0;
   double _unavailabilityQueueFillGrade = 0.75;
+  std::string _schedulerType = "supervised";
 
   std::unique_ptr<Scheduler> _scheduler;
   metrics::MetricsFeature& _metricsFeature;

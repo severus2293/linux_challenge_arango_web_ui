@@ -26,6 +26,7 @@
 #include "CommTask.h"
 
 #include "ApplicationFeatures/ApplicationServer.h"
+#include "Auth/UserManager.h"
 #include "Basics/EncodingUtils.h"
 #include "Basics/HybridLogicalClock.h"
 #include "Basics/StaticStrings.h"
@@ -43,6 +44,7 @@
 #include "RestServer/DatabaseFeature.h"
 #include "RestServer/VocbaseContext.h"
 #include "Scheduler/SchedulerFeature.h"
+#include "Scheduler/Scheduler.h"
 #include "Statistics/ConnectionStatistics.h"
 #include "Statistics/RequestStatistics.h"
 #include "Utils/Events.h"
@@ -91,15 +93,12 @@ bool resolveRequestContext(ArangodServer& server, GeneralRequest& req) {
   TRI_ASSERT(!vocbase->isDangling());
 
   // FIXME(gnusi): modify VocbaseContext to accept VocbasePtr
-  std::unique_ptr<VocbaseContext> guard(
-      VocbaseContext::create(req, *vocbase.release()));
-  if (!guard) {
+  auto context = VocbaseContext::create(req, *vocbase.release());
+  if (!context) {
     return false;
   }
-
-  // the vocbase context is now responsible for releasing the vocbase
-  req.setRequestContext(guard.get(), true);
-  guard.release();
+  // the VocbaseContext is now responsible for releasing the vocbase
+  req.setRequestContext(std::move(context));
 
   // the "true" means the request is the owner of the context
   return true;
@@ -475,8 +474,8 @@ void CommTask::executeRequest(std::unique_ptr<GeneralRequest> request,
     return;
   }
 
-  if (res.hasValue() && res.get().fail()) {
-    auto& r = res.get();
+  if (res.hasValue() && res.waitAndGet().fail()) {
+    auto& r = res.waitAndGet();
     sendErrorResponse(GeneralResponse::responseCode(r.errorNumber()), respType,
                       messageId, r.errorNumber(), r.errorMessage());
     return;
@@ -779,7 +778,7 @@ CommTask::Flow CommTask::canAccessPath(auth::TokenCache::Entry const& token,
   bool userAuthenticated = req.authenticated();
   Flow result = userAuthenticated ? Flow::Continue : Flow::Abort;
 
-  VocbaseContext* vc = static_cast<VocbaseContext*>(req.requestContext());
+  auto vc = basics::downCast<VocbaseContext>(req.requestContext());
   TRI_ASSERT(vc != nullptr);
   // deny access to database with NONE
   if (result == Flow::Continue &&

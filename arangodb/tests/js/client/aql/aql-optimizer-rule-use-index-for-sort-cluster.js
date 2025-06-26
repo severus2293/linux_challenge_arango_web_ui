@@ -22,22 +22,11 @@
 // / Copyright holder is ArangoDB GmbH, Cologne, Germany
 // /
 /// @author Jan Steemann
-/// @author Copyright 2012, triAGENS GmbH, Cologne, Germany
 // //////////////////////////////////////////////////////////////////////////////
 
-var internal = require("internal");
-var db = internal.db;
-var jsunity = require("jsunity");
-var helper = require("@arangodb/aql-helper");
-var isEqual = helper.isEqual;
-var findExecutionNodes = helper.findExecutionNodes;
-var findReferencedNodes = helper.findReferencedNodes;
-var getQueryMultiplePlansAndExecutions = helper.getQueryMultiplePlansAndExecutions;
-var removeAlwaysOnClusterRules = helper.removeAlwaysOnClusterRules;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief test suite
-////////////////////////////////////////////////////////////////////////////////
+const internal = require("internal");
+const db = internal.db;
+const jsunity = require("jsunity");
 
 function optimizerRuleTestSuite() {
   const ruleName = "use-index-for-sort";
@@ -45,7 +34,6 @@ function optimizerRuleTestSuite() {
   let c;
 
   return {
-
     setUp : function () {
       internal.db._drop(colName);
       c = internal.db._create(colName, {numberOfShards: 5});
@@ -55,12 +43,8 @@ function optimizerRuleTestSuite() {
       }
       c.insert(docs);
 
-      c.ensureIndex({ type: "skiplist", fields: [ "value" ] });
+      c.ensureIndex({ type: "persistent", fields: [ "value" ] });
     },
-
-    ////////////////////////////////////////////////////////////////////////////////
-    /// @brief tear down
-    ////////////////////////////////////////////////////////////////////////////////
 
     tearDown : function () {
       internal.db._drop(colName);
@@ -71,7 +55,9 @@ function optimizerRuleTestSuite() {
       let plan = db._createStatement(query).explain().plan;
       let nodes = plan.nodes.filter(function(n) { return n.type === 'GatherNode'; });
       assertEqual(1, nodes.length);
-      assertEqual("doc", nodes[0].elements[0].inVariable.name);
+      let matNodes = plan.nodes.filter(function(n) { return n.type === 'MaterializeNode'; });
+      assertEqual(1, matNodes.length);
+      assertEqual(matNodes[0].outVariable.name, nodes[0].elements[0].inVariable.name);
       assertEqual(["value"], nodes[0].elements[0].path);
       assertTrue(nodes[0].elements[0].ascending);
       assertNotEqual(-1, plan.rules.indexOf(ruleName));
@@ -90,7 +76,9 @@ function optimizerRuleTestSuite() {
       let plan = db._createStatement(query).explain().plan;
       let nodes = plan.nodes.filter(function(n) { return n.type === 'GatherNode'; });
       assertEqual(1, nodes.length);
-      assertEqual("doc", nodes[0].elements[0].inVariable.name);
+      let matNodes = plan.nodes.filter(function(n) { return n.type === 'MaterializeNode'; });
+      assertEqual(1, matNodes.length);
+      assertEqual(matNodes[0].outVariable.name, nodes[0].elements[0].inVariable.name);
       assertEqual(["value"], nodes[0].elements[0].path);
       assertFalse(nodes[0].elements[0].ascending);
       assertNotEqual(-1, plan.rules.indexOf(ruleName));
@@ -115,7 +103,9 @@ function optimizerRuleTestSuite() {
       let plan = db._createStatement(query).explain().plan;
       let nodes = plan.nodes.filter(function(n) { return n.type === 'GatherNode'; });
       assertEqual(1, nodes.length);
-      assertEqual("doc", nodes[0].elements[0].inVariable.name);
+      let matNodes = plan.nodes.filter(function(n) { return n.type === 'MaterializeNode'; });
+      assertEqual(1, matNodes.length);
+      assertEqual(matNodes[0].outVariable.name, nodes[0].elements[0].inVariable.name);
       assertEqual(["value"], nodes[0].elements[0].path);
       assertTrue(nodes[0].elements[0].ascending);
       assertNotEqual(-1, plan.rules.indexOf(ruleName));
@@ -188,17 +178,20 @@ function optimizerRuleTestSuite() {
       let query = "FOR doc IN " + colName + " COLLECT value = doc.value INTO g OPTIONS { method: 'sorted' } RETURN { value, g }";
       let plan = db._createStatement(query).explain().plan;
       let nodes = plan.nodes.filter(function(n) { return n.type === 'CollectNode'; });
-      assertEqual(1, nodes.length);
+      assertEqual(2, nodes.length);
       assertEqual([], nodes[0].aggregates);
+      assertEqual(1, nodes[1].aggregates.length);
+      assertEqual("MERGE_LISTS", nodes[1].aggregates[0].type);
       assertEqual("sorted", nodes[0].collectOptions.method);
-      
+      assertEqual("sorted", nodes[1].collectOptions.method);
+
       nodes = plan.nodes.filter(function(n) { return n.type === 'GatherNode'; });
       assertEqual(1, nodes.length);
       assertTrue(nodes[0].elements[0].ascending);
 
       assertNotEqual(-1, plan.rules.indexOf(ruleName));
-      assertEqual(-1, plan.rules.indexOf("collect-in-cluster"));
-    
+      assertNotEqual(-1, plan.rules.indexOf("collect-in-cluster"));
+
       let results = db._query(query).toArray();
       assertEqual(2000, results.length);
       let last = null;
@@ -209,7 +202,7 @@ function optimizerRuleTestSuite() {
         assertEqual(doc.value, doc.g[0].doc.value);
       });
     },
-    
+
     testCollectIntoSortedKeepGatherNonUnique : function () {
       // add the same values again
       let docs = [];
@@ -220,16 +213,19 @@ function optimizerRuleTestSuite() {
       let query = "FOR doc IN " + colName + " COLLECT value = doc.value INTO g OPTIONS { method: 'sorted' } RETURN { value, g }";
       let plan = db._createStatement(query).explain().plan;
       let nodes = plan.nodes.filter(function(n) { return n.type === 'CollectNode'; });
-      assertEqual(1, nodes.length);
+      assertEqual(2, nodes.length);
       assertEqual([], nodes[0].aggregates);
+      assertEqual(1, nodes[1].aggregates.length);
+      assertEqual("MERGE_LISTS", nodes[1].aggregates[0].type);
       assertEqual("sorted", nodes[0].collectOptions.method);
-      
+      assertEqual("sorted", nodes[1].collectOptions.method);
+
       nodes = plan.nodes.filter(function(n) { return n.type === 'GatherNode'; });
       assertEqual(1, nodes.length);
       assertTrue(nodes[0].elements[0].ascending);
 
       assertNotEqual(-1, plan.rules.indexOf(ruleName));
-      assertEqual(-1, plan.rules.indexOf("collect-in-cluster"));
+      assertNotEqual(-1, plan.rules.indexOf("collect-in-cluster"));
     
       let results = db._query(query).toArray();
       assertEqual(2000, results.length);

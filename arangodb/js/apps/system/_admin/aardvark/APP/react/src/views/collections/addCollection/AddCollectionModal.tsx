@@ -31,12 +31,12 @@ const minReplicationFactor = window.frontendConfig.minReplicationFactor ?? 1;
 const maxReplicationFactor = window.frontendConfig.maxReplicationFactor ?? 10;
 const maxNumberOfShards = window.frontendConfig.maxNumberOfShards;
 
-const extendedNameSchema = Yup.string()
+const legacyNameSchema = Yup.string()
   .matches(/^[a-zA-Z]/, "Collection name must always start with a letter.")
   .matches(/^[a-zA-Z0-9\-_]*$/, 'Only symbols, "_" and "-" are allowed.')
   .max(256, "Collection name max length is 256 bytes.");
 
-const legacyNameSchema = Yup.string()
+const extendedNameSchema = Yup.string()
   .matches(
     /^(?![0-9._])/,
     "Collection name cannot start with a number, a dot (.), or an underscore (_)."
@@ -136,15 +136,12 @@ export const AddCollectionModal = ({
       isSatellite,
       ...extra
     } = values;
-    const clusterOptions = window.App
-      .isCluster
+    const clusterOptions = window.App.isCluster
       ? distributeShardsLike
         ? { distributeShardsLike, ...extra }
         : {
             numberOfShards,
-            replicationFactor: isSatellite
-              ? "satellite"
-              : replicationFactor,
+            replicationFactor: isSatellite ? "satellite" : replicationFactor,
             smartJoinAttribute: smartJoinAttribute || undefined,
             writeConcern,
             ...extra
@@ -165,7 +162,7 @@ export const AddCollectionModal = ({
       mutate("/collections");
       onClose();
     } catch (error: any) {
-      const errorMessage = error?.response?.body?.errorMessage;
+      const errorMessage = error?.response?.parsedBody?.errorMessage;
       if (errorMessage) {
         window.arangoHelper.arangoError("Collection", errorMessage);
       }

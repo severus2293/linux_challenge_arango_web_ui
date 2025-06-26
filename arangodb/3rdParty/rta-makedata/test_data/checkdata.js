@@ -51,6 +51,12 @@ let {
 } = require(fs.join(PWD, 'common'));
 
 const {
+  assertTrue,
+  assertFalse,
+  assertEqual
+} = require("jsunity").jsUnity.assertions;
+
+const {
   createAnalyzerSet,
   checkAnalyzerSet,
   deleteAnalyzerSet
@@ -74,7 +80,8 @@ const optionsDefaults = {
   oldVersion: "3.5.0",
   test: undefined,
   passvoid: '',
-  printTimeMeasurement: false
+  printTimeMeasurement: false,
+  forceOneShard: false
 };
 
 let args = _.clone(ARGUMENTS);
@@ -87,6 +94,9 @@ if ((args.length > 0) &&
 let opts = internal.parseArgv(args, 0);
 _.defaults(opts, optionsDefaults);
 setOptions(opts);
+if (opts.collectionCountOffset !== 0 && database === '_system') {
+  throw new Error("must not specify count without different database.");
+}
 
 var numberLength = Math.log(opts.numberOfDBs + opts.countOffset) * Math.LOG10E + 1 | 0;
 
@@ -129,7 +139,7 @@ function getReplicationFactor (defaultReplicationFactor) {
 }
 
 const fns = scanMakeDataPaths(opts, PWD, dbVersion, opts.oldVersion, wantFunctions, 'checkData', false);
-mainTestLoop(opts, isCluster, enterprise, fns, function(database) {
+mainTestLoop(opts, database, isCluster, enterprise, fns, function(database) {
   if (opts.printTimeMeasurement) {
     opts.error(timeLine.join());
   }

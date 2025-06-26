@@ -37,7 +37,6 @@
 #include <vector>
 
 #include "ApplicationFeatures/ApplicationFeature.h"
-#include "Basics/Common.h"
 #include "Basics/ConditionVariable.h"
 
 #include <velocypack/Builder.h>
@@ -112,7 +111,6 @@ class ApplicationServer {
   ApplicationServer& operator=(ApplicationServer const&) = delete;
 
  public:
-  // handled i.e. in WindowsServiceFeature.cpp
   enum class State : int {
     UNINITIALIZED,
     IN_COLLECT_OPTIONS,
@@ -472,7 +470,8 @@ class ApplicationServerT : public ApplicationServer {
                   std::is_base_of_v<Impl, Type>);
     constexpr auto featureId = Features::template id<Type>();
 
-    TRI_ASSERT(hasFeature<Type>());
+    TRI_ASSERT(hasFeature<Type>())
+        << "Feature missing: " << typeid(Type).name();
     auto& feature = *_features[featureId];
 #ifdef ARANGODB_ENABLE_MAINTAINER_MODE
     auto obj = dynamic_cast<Impl*>(&feature);

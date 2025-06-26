@@ -4,7 +4,7 @@ add_library(arango_shell STATIC
 )
 
 target_link_libraries(arango_shell
-  arango
+  arango_basic_utils
   ${SYSTEM_LIBRARIES}
   boost_system
   boost_boost
@@ -37,8 +37,8 @@ if (USE_V8)
   target_include_directories(${BIN_ARANGOSH} PRIVATE ${PROJECT_SOURCE_DIR}/client-tools)
 
   target_link_libraries(${BIN_ARANGOSH}
-    arango
     arango_v8
+    arango_basic_http_client
     ${V8_LIBS}
     fuerte
     ${SYSTEM_LIBRARIES}
@@ -72,9 +72,7 @@ if (USE_V8)
     add_dependencies(${BIN_ARANGOSH} jemalloc_build)
   endif ()
 
-  if (UNIX) 
-    add_dependencies(${BIN_ARANGOSH} man)
-  endif ()
+  add_dependencies(${BIN_ARANGOSH} man)
 
 ################################################################################
 ## foxx-manager

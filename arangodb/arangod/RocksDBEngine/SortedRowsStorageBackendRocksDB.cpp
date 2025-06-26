@@ -26,16 +26,16 @@
 #include "Aql/AqlItemBlockInputRange.h"
 #include "Aql/AqlItemBlockManager.h"
 #include "Aql/ExecutionState.h"
+#include "Aql/Executor/SortExecutor.h"
 #include "Aql/InputAqlItemRow.h"
 #include "Aql/OutputAqlItemRow.h"
 #include "Aql/QueryContext.h"
 #include "Aql/SharedAqlItemBlockPtr.h"
-#include "Aql/SortExecutor.h"
 #include "Aql/SortRegister.h"
 #include "Basics/Exceptions.h"
 #include "Basics/debugging.h"
-#include "RocksDBEngine/RocksDBKey.h"
 #include "RocksDBEngine/RocksDBFormat.h"
+#include "RocksDBEngine/RocksDBKey.h"
 #include "RocksDBEngine/RocksDBSortedRowsStorageContext.h"
 #include "RocksDBEngine/RocksDBTempStorage.h"
 
@@ -54,7 +54,7 @@ SortedRowsStorageBackendRocksDB::SortedRowsStorageBackendRocksDB(
       _rowNumberForInsert(0),
       _memoryTracker(nullptr, nullptr,
                      RocksDBMethodsMemoryTracker::kDefaultGranularity) {
-  _memoryTracker.beginQuery(&_infos.getQuery().resourceMonitor());
+  _memoryTracker.beginQuery(_infos.getQuery().resourceMonitorAsSharedPtr());
 }
 
 SortedRowsStorageBackendRocksDB::~SortedRowsStorageBackendRocksDB() {

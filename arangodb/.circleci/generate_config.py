@@ -1,8 +1,11 @@
 #!/bin/env python3
 """ read test definition, and generate the output for the specified target """
 from collections import namedtuple
+from datetime import date
 import argparse
+import json
 import os
+import re
 import sys
 import traceback
 import yaml
@@ -71,6 +74,18 @@ def parse_arguments():
     parser.add_argument("-o", "--output", type=str, help="filename of the output")
     parser.add_argument("-s", "--sanitizer", type=str, help="sanitizer to use")
     parser.add_argument(
+        "--ui", type=str, help="whether to run UI test [off|on|only|community]"
+    )
+    parser.add_argument(
+        "--ui-testsuites", type=str, help="which test of UI job to run [off|on|only]"
+    )
+    parser.add_argument(
+        "--ui-deployments", type=str, help="which deployments [CL, SG, ...] to run"
+    )
+    parser.add_argument(
+        "--rta-branch", type=str, help="which branch for the ui tests to check out"
+    )
+    parser.add_argument(
         "--validate-only",
         help="validates the test definition file",
         action="store_true",
@@ -101,6 +116,12 @@ def parse_arguments():
         default=False,
         action="store_true",
         help="flag whether this is a nightly build",
+    )
+    parser.add_argument(
+        "--create-docker-images",
+        default=False,
+        action="store_true",
+        help="flag whether we want to create docker images based on the build results",
     )
     return parser.parse_args()
 
@@ -147,14 +168,16 @@ def read_definition_line(line):
 
     flags = []
     params = {}
+    arangosh_args = []
     args = []
 
     for idx, bit in enumerate(remainder):
         if bit == "--":
             args = remainder[idx + 1 :]
             break
-
-        if "=" in bit:
+        if bit.startswith("--"):
+            arangosh_args.append(bit)
+        elif "=" in bit:
             key, value = bit.split("=", maxsplit=1)
             params[key] = value
         else:
@@ -174,12 +197,15 @@ def read_definition_line(line):
     is_cluster = "cluster" in flags
     params = validate_params(params)
 
+    if len(arangosh_args) == 0:
+        arangosh_args = ""
     return {
         "name": params.get("name", suites),
         "suites": suites,
         "size": params.get("size", "medium" if is_cluster else "small"),
         "flags": flags,
         "args": args,
+        "arangosh_args": arangosh_args,
         "params": params,
     }
 
@@ -248,7 +274,7 @@ def get_size(size, arch):
         "medium+": "arm.large",
         "large": "arm.large",
         "xlarge": "arm.xlarge",
-        "2xlarge": "arm.xlarge",
+        "2xlarge": "arm.2xlarge",
     }
     x86_sizes = {
         "small": "small",
@@ -256,7 +282,7 @@ def get_size(size, arch):
         "medium+": "medium+",
         "large": "large",
         "xlarge": "xlarge",
-        "2xlarge": "xlarge",
+        "2xlarge": "2xlarge",
     }
     return aarch64_sizes[size] if arch == "aarch64" else x86_sizes[size]
 
@@ -271,7 +297,7 @@ def get_test_size(size, build_config, cluster):
     return get_size(size, build_config.arch)
 
 
-def create_test_job(test, cluster, build_config, build_job, replication_version=1):
+def create_test_job(test, cluster, build_config, build_jobs, replication_version=1):
     """creates the test job definition to be put into the config yaml"""
     edition = "ee" if build_config.enterprise else "ce"
     params = test["params"]
@@ -287,14 +313,19 @@ def create_test_job(test, cluster, build_config, build_job, replication_version=
     deployment_variant = (
         f"cluster{'-repl2' if replication_version==2 else ''}" if cluster else "single"
     )
-
+    arangosh_args = ""
+    if 'arangosh_args' in test:
+        # Yaml workaround: prepend an A to stop bad things from happening.
+        arangosh_args = "A " + json.dumps(test["arangosh_args"])
+        del(test["arangosh_args"])
     job = {
         "name": f"test-{edition}-{deployment_variant}-{suite_name}-{build_config.arch}",
         "suiteName": suite_name,
         "suites": test["suites"],
+        "arangosh_args": arangosh_args,
         "size": get_test_size(size, build_config, cluster),
         "cluster": cluster,
-        "requires": [build_job],
+        "requires": build_jobs,
     }
     if suite_name == "chaos" and build_config.isNightly:
         # nightly chaos tests runs 32 different combinations, each running for 3 min plus some time to check for consistency
@@ -325,37 +356,88 @@ def create_test_job(test, cluster, build_config, build_job, replication_version=
     return {"run-linux-tests": job}
 
 
+def create_rta_test_job(build_config, build_jobs, deployment_mode, filter_statement, rta_branch):
+    edition = "ee" if build_config.enterprise else "ce"
+    job = {
+        "name": f"test-{filter_statement}-{edition}-{deployment_mode}-UI",
+        "suiteName": filter_statement,
+        "arangosh_args": "",
+        "deployment": deployment_mode,
+        "browser": "Remote_CHROME",
+        "enterprise": "EP" if build_config.enterprise else "C",
+        "filterStatement": f"--ui-include-test-suite {filter_statement}",
+        "requires": build_jobs,
+        "rta-branch": rta_branch,
+    }
+    return {"run-rta-tests": job}
+
+
 def add_test_definition_jobs_to_workflow(
-    workflow, tests, build_config, build_job, repl2
+    workflow, tests, build_config, build_jobs, repl2
 ):
     jobs = workflow["jobs"]
     for test in tests:
         if "cluster" in test["flags"]:
-            jobs.append(create_test_job(test, True, build_config, build_job))
+            jobs.append(create_test_job(test, True, build_config, build_jobs))
             if repl2:
-                jobs.append(create_test_job(test, True, build_config, build_job, 2))
+                jobs.append(create_test_job(test, True, build_config, build_jobs, 2))
         elif "single" in test["flags"]:
-            jobs.append(create_test_job(test, False, build_config, build_job))
+            jobs.append(create_test_job(test, False, build_config, build_jobs))
         else:
-            jobs.append(create_test_job(test, True, build_config, build_job))
+            jobs.append(create_test_job(test, True, build_config, build_jobs))
             if repl2:
-                jobs.append(create_test_job(test, True, build_config, build_job, 2))
-            jobs.append(create_test_job(test, False, build_config, build_job))
+                jobs.append(create_test_job(test, True, build_config, build_jobs, 2))
+            jobs.append(create_test_job(test, False, build_config, build_jobs))
 
 
-def add_test_jobs_to_workflow(workflow, tests, build_config, build_job, repl2):
+def add_rta_ui_test_jobs_to_workflow(args, workflow, build_config, build_jobs):
+    jobs = workflow["jobs"]
+    ui_testsuites = [
+        "UserPageTestSuite",
+        "CollectionsTestSuite",
+        "ViewsTestSuite",
+        "GraphTestSuite",
+        "QueryTestSuite",
+        "AnalyzersTestSuite",
+        "DatabaseTestSuite",
+        "LogInTestSuite",
+        "DashboardTestSuite",
+        "SupportTestSuite",
+        "ServiceTestSuite",
+    ]
+    if args.ui_testsuites != "":
+        ui_testsuites = args.ui_testsuites.split(",")
+    deployments = [
+        "SG",
+        "CL",
+    ]
+    if args.ui_deployments:
+        deployments = args.ui_deployments.split(",")
+
+    for deployment in deployments:
+        for test_suite in ui_testsuites:
+            jobs.append(
+                create_rta_test_job(build_config, build_jobs, deployment, test_suite, args.rta_branch)
+            )
+
+
+def add_test_jobs_to_workflow(args, workflow, tests, build_config, build_jobs, repl2):
+    if build_config.arch == "x64" and args.ui != "" and args.ui != "off":
+        add_rta_ui_test_jobs_to_workflow(args, workflow, build_config, build_jobs)
+    if args.ui == "only":
+        return
     if build_config.enterprise:
         workflow["jobs"].append(
             {
                 "run-hotbackup-tests": {
                     "name": f"run-hotbackup-tests-{build_config.arch}",
                     "size": get_test_size("medium", build_config, True),
-                    "requires": [build_job],
+                    "requires": build_jobs,
                 }
             }
         )
     add_test_definition_jobs_to_workflow(
-        workflow, tests, build_config, build_job, repl2
+        workflow, tests, build_config, build_jobs, repl2
     )
 
 
@@ -365,6 +447,40 @@ def add_cppcheck_job(workflow, build_job):
             "run-cppcheck": {
                 "name": "cppcheck",
                 "requires": [build_job],
+            }
+        }
+    )
+
+
+def add_create_docker_image_job(workflow, build_config, build_jobs, args):
+    if not args.create_docker_images:
+        return
+    edition = "ee" if build_config.enterprise else "ce"
+    arch = "amd64" if build_config.arch == "x64" else "arm64"
+    image = (
+        "public.ecr.aws/b0b8h2r4/enterprise-preview"
+        if build_config.enterprise
+        else "public.ecr.aws/b0b8h2r4/arangodb-preview"
+    )
+    branch = os.environ.get("CIRCLE_BRANCH", "unknown-brach")
+    match = re.fullmatch("(.+\/)?(.+)", branch)
+    if match:
+        branch = match.group(2)
+
+    sha1 = os.environ.get("CIRCLE_SHA1")
+    if sha1 is None:
+        sha1 = "unknown-sha1"
+    else:
+        sha1 = sha1[:7]
+    tag = f"{date.today()}-{branch}-{sha1}-{arch}"
+    workflow["jobs"].append(
+        {
+            "create-docker-image": {
+                "name": f"create-{edition}-{build_config.arch}-docker-image",
+                "resource-class": get_size("large", build_config.arch),
+                "arch": arch,
+                "tag": f"{image}:{tag}",
+                "requires": build_jobs,
             }
         }
     )
@@ -381,10 +497,11 @@ def add_build_job(workflow, build_config, overrides=None):
         "context": [
             "sccache-aws-bucket"
         ],  # add the environment variables to setup sccache for the S3 bucket
-        "resource-class": get_size("xlarge", build_config.arch),
+        "resource-class": get_size("2xlarge", build_config.arch),
         "name": name,
         "preset": preset,
         "enterprise": build_config.enterprise,
+        "arch": build_config.arch,
     }
     if build_config.arch == "aarch64":
         params["s3-prefix"] = "aarch64"
@@ -393,10 +510,29 @@ def add_build_job(workflow, build_config, overrides=None):
     return name
 
 
+def add_frontend_build_job(workflow, build_config, overrides=None):
+    edition = "ee" if build_config.enterprise else "ce"
+    preset = "enterprise-pr" if build_config.enterprise else "community-pr"
+    if build_config.sanitizer != "":
+        preset += f"-{build_config.sanitizer}"
+    suffix = "" if build_config.sanitizer == "" else f"-{build_config.sanitizer}"
+    name = f"build-{edition}-{build_config.arch}{suffix}-frontend"
+    workflow["jobs"].append({"build-frontend": {"name": name}})
+    return name
+
+
 def add_workflow(workflows, tests, build_config, args):
-    tests = filter_tests(args, tests, build_config.enterprise, build_config.isNightly)
     repl2 = args.replication_two
     suffix = "nightly" if build_config.isNightly else "pr"
+    if build_config.arch == "x64" and args.ui != "" and args.ui != "off":
+        ui = True
+        if args.ui == "only":
+            suffix = "only_ui_tests-" + suffix
+        else:
+            suffix = "with_ui_tests-" + suffix
+    else:
+        ui = False
+        suffix = "no_ui_tests-" + suffix
     if build_config.sanitizer != "":
         suffix += "-" + build_config.sanitizer
     if args.replication_two:
@@ -406,9 +542,14 @@ def add_workflow(workflows, tests, build_config, args):
     workflows[name] = {"jobs": []}
     workflow = workflows[name]
     build_job = add_build_job(workflow, build_config)
-    if build_config.arch == "x64":
+    frontend_job = add_frontend_build_job(workflow, build_config)
+    build_jobs = [build_job, frontend_job]
+    if build_config.arch == "x64" and not ui:
         add_cppcheck_job(workflow, build_job)
-    add_test_jobs_to_workflow(workflow, tests, build_config, build_job, repl2)
+    add_create_docker_image_job(workflow, build_config, build_jobs, args)
+
+    tests = filter_tests(args, tests, build_config.enterprise, build_config.isNightly)
+    add_test_jobs_to_workflow(args, workflow, tests, build_config, build_jobs, repl2)
     return workflow
 
 
@@ -427,7 +568,7 @@ def add_x64_community_workflow(workflows, tests, args):
 def add_x64_enterprise_workflow(workflows, tests, args):
     build_config = BuildConfig("x64", True, args.sanitizer, args.nightly)
     workflow = add_workflow(workflows, tests, build_config, args)
-    if args.sanitizer == "":
+    if args.sanitizer == "" and (args.ui == "off" or args.ui == ""):
         add_build_job(
             workflow,
             build_config,
@@ -438,22 +579,10 @@ def add_x64_enterprise_workflow(workflows, tests, args):
                 "build-tests": False,
             },
         )
-        add_build_job(
-            workflow,
-            build_config,
-            {
-                "name": "build-ee-no-v8-x64",
-                "preset": "enterprise-pr-no-v8",
-                "publish-artifacts": False,
-                "build-tests": False,
-                "build-v8": False,
-            },
-        )
 
 
 def add_aarch64_community_workflow(workflows, tests, args):
-    # for normal PR runs we run only aarch64 enterprise
-    if args.nightly:
+    if args.ui != "only":
         add_workflow(
             workflows,
             tests,
@@ -463,12 +592,13 @@ def add_aarch64_community_workflow(workflows, tests, args):
 
 
 def add_aarch64_enterprise_workflow(workflows, tests, args):
-    add_workflow(
-        workflows,
-        tests,
-        BuildConfig("aarch64", True, args.sanitizer, args.nightly),
-        args,
-    )
+    if args.ui != "only":
+        add_workflow(
+            workflows,
+            tests,
+            BuildConfig("aarch64", True, args.sanitizer, args.nightly),
+            args,
+        )
 
 
 def generate_jobs(config, args, tests):
@@ -486,10 +616,14 @@ def main():
     """entrypoint"""
     try:
         args = parse_arguments()
+        if args.sanitizer is None:
+            args.sanitizer = ""
         if not args.sanitizer in ["", "tsan", "alubsan"]:
             raise Exception(
                 f"Invalid sanitizer {args.sanitizer} - must be either empty, 'tsan' or 'alubsan'"
             )
+        if args.ui_testsuites is None:
+            args.ui_testsuites = ""
         tests = read_definitions(args.definitions)
         # if args.validate_only:
         #    return  # nothing left to do

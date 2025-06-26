@@ -26,8 +26,6 @@
 #include <memory>
 #include <type_traits>
 
-#include "Basics/Common.h"
-
 namespace arangodb::aql {
 class ExecutionPlan;
 class Optimizer;
@@ -106,6 +104,9 @@ struct OptimizerRule {
     inlineSubqueriesRule,
 
     replaceLikeWithRange,
+
+    // replace iteration over an ENTRIES array with an object iteration
+    replaceEntriesWithObjectIteration,
 
     /// simplify some conditions in CalculationNodes
     simplifyConditionsRule,
@@ -204,6 +205,9 @@ struct OptimizerRule {
     removeFiltersCoveredByIndexRule,
 
     removeUnnecessaryFiltersRule2,
+
+    // try to use vector index if possible
+    useVectorIndexForSort,
 
     // try to find sort blocks which are superseeded by indexes
     useIndexForSortRule,
@@ -368,6 +372,16 @@ struct OptimizerRule {
     // for index
     lateDocumentMaterializationRule,
 
+    // push limit from node limit into an index node
+    // this must be before `batchMaterializeDocumentsRule` because
+    // we expect either calculation node or sort and limit node in succession,
+    // and this rule adds a materialization node in between which messes up
+    // with detection.
+    // this must be also after `optimizeProjectionsRule` because we want
+    // calculation node so we can access the attribute path of the sort
+    // attribute, otherwise that is optimized away as an anonymous variable
+    pushLimitIntoIndexRule,
+
     // batch materialization rule
     batchMaterializeDocumentsRule,
 
@@ -379,6 +393,12 @@ struct OptimizerRule {
     // for it.
     joinIndexNodesRule,
 
+    useIndexForCollectRule,
+
+    pushDownLateMaterialization,
+
+    // introduce a new out variable for late materialization blocks
+    materializeIntoSeparateVariable,
     // remove unnecessary projections & store projection attributes in
     // individual registers. must be executed after the joinIndexNodesRule,
     // otherwise the projections handling of JoinNodes will be incorrect.

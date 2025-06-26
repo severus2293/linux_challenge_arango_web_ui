@@ -24,8 +24,11 @@
 #pragma once
 
 #include "RestServer/arangod.h"
+#include "Aql/AsyncPrefetchSlotsManager.h"
 #include "Aql/QueryRegistry.h"
 #include "Metrics/Fwd.h"
+
+#include <atomic>
 
 namespace arangodb {
 
@@ -38,11 +41,11 @@ class QueryRegistryFeature final : public ArangodFeature {
   }
 
   QueryRegistryFeature(Server& server, metrics::MetricsFeature& metrics);
+  ~QueryRegistryFeature();
 
   void collectOptions(std::shared_ptr<options::ProgramOptions>) override final;
   void validateOptions(std::shared_ptr<options::ProgramOptions>) override final;
   void prepare() override final;
-  void start() override final;
   void beginShutdown() override final;
   void stop() override final;
   void unprepare() override final;
@@ -82,6 +85,8 @@ class QueryRegistryFeature final : public ArangodFeature {
     return _allowCollectionsInExpressions;
   }
   bool logFailedQueries() const noexcept { return _logFailedQueries; }
+  size_t leaseAsyncPrefetchSlots(size_t value) noexcept;
+  void returnAsyncPrefetchSlots(size_t value) noexcept;
   uint64_t queryGlobalMemoryLimit() const noexcept {
     return _queryGlobalMemoryLimit;
   }
@@ -93,10 +98,34 @@ class QueryRegistryFeature final : public ArangodFeature {
   }
   uint64_t maxParallelism() const noexcept { return _maxParallelism; }
 
+  uint64_t queryPlanCacheMaxEntries() const noexcept {
+    return _queryPlanCacheMaxEntries;
+  }
+  uint64_t queryPlanCacheMaxMemoryUsage() const noexcept {
+    return _queryPlanCacheMaxMemoryUsage;
+  }
+  uint64_t queryPlanCacheMaxIndividualEntrySize() const noexcept {
+    return _queryPlanCacheMaxIndividualEntrySize;
+  }
+  double queryPlanCacheInvalidationTime() const noexcept {
+    return _queryPlanCacheInvalidationTime;
+  }
+  metrics::Counter* queryPlanCacheHitsMetric() const {
+    return &_queryPlanCacheHitsMetric;
+  }
+  metrics::Counter* queryPlanCacheMissesMetric() const {
+    return &_queryPlanCacheMissesMetric;
+  }
+  metrics::Gauge<uint64_t>* queryPlanCacheMemoryUsage() const {
+    return &_queryPlanCacheMemoryUsage;
+  }
+
   metrics::Gauge<uint64_t>* cursorsMetric() const { return &_activeCursors; }
   metrics::Gauge<uint64_t>* cursorsMemoryUsageMetric() const {
     return &_cursorsMemoryUsage;
   }
+
+  aql::AsyncPrefetchSlotsManager& asyncPrefetchSlotsManager() noexcept;
 
  private:
   bool _trackingEnabled;
@@ -114,6 +143,8 @@ class QueryRegistryFeature final : public ArangodFeature {
 #endif
   bool _allowCollectionsInExpressions;
   bool _logFailedQueries;
+  size_t _maxAsyncPrefetchSlotsTotal;
+  size_t _maxAsyncPrefetchSlotsPerQuery;
   size_t _maxQueryStringLength;
   size_t _maxCollectionsPerQuery;
   uint64_t _peakMemoryUsageThreshold;
@@ -123,6 +154,16 @@ class QueryRegistryFeature final : public ArangodFeature {
   double _queryMaxRuntime;
   uint64_t _maxQueryPlans;
   uint64_t _maxNodesPerCallstack;
+
+  // query plan cache - maximum number of entries
+  uint64_t _queryPlanCacheMaxEntries;
+  // query plan cache - maximum memory usage
+  uint64_t _queryPlanCacheMaxMemoryUsage;
+  // query plan cache - maximum individual entry size
+  uint64_t _queryPlanCacheMaxIndividualEntrySize;
+  // query plan cache - invalidation time in seconds
+  double _queryPlanCacheInvalidationTime;
+
   uint64_t _queryCacheMaxResultsCount;
   uint64_t _queryCacheMaxResultsSize;
   uint64_t _queryCacheMaxEntrySize;
@@ -132,10 +173,10 @@ class QueryRegistryFeature final : public ArangodFeature {
   double _queryRegistryTTL;
   std::string _queryCacheMode;
 
- private:
   static std::atomic<aql::QueryRegistry*> QUERY_REGISTRY;
 
   std::unique_ptr<aql::QueryRegistry> _queryRegistry;
+  aql::AsyncPrefetchSlotsManager _asyncPrefetchSlotsManager;
 
   metrics::Histogram<metrics::LogScale<double>>& _queryTimes;
   metrics::Histogram<metrics::LogScale<double>>& _slowQueryTimes;
@@ -148,6 +189,9 @@ class QueryRegistryFeature final : public ArangodFeature {
   metrics::Counter& _localQueryMemoryLimitReached;
   metrics::Gauge<uint64_t>& _activeCursors;
   metrics::Gauge<uint64_t>& _cursorsMemoryUsage;
+  metrics::Counter& _queryPlanCacheHitsMetric;
+  metrics::Counter& _queryPlanCacheMissesMetric;
+  metrics::Gauge<uint64_t>& _queryPlanCacheMemoryUsage;
 };
 
 }  // namespace arangodb

@@ -101,17 +101,20 @@ function optimizerCollectMethodsTestSuite () {
     testNumberOfPlans : function () {
       c.ensureIndex({ type: "persistent", fields: [ "value" ] }); 
       const queries = [
-        "FOR j IN " + c.name() + " COLLECT value = j RETURN value",
-        "FOR j IN " + c.name() + " COLLECT value = j WITH COUNT INTO l RETURN [ value, l ]",
-        "FOR j IN " + c.name() + " COLLECT value = j INTO g RETURN g",
-        "FOR j IN " + c.name() + " COLLECT value = j INTO g = j.haxe RETURN g",
-        "FOR j IN " + c.name() + " COLLECT value = j INTO g RETURN [ value, g ]",
-        "FOR j IN " + c.name() + " COLLECT value = j INTO g KEEP j RETURN g"
+        [ "FOR j IN " + c.name() + " COLLECT value = j RETURN value", 2 ],
+        [ "FOR j IN " + c.name() + " COLLECT value = j WITH COUNT INTO l RETURN [ value, l ]", 2 ],
+        [ "FOR j IN " + c.name() + " COLLECT value = j INTO g RETURN g", 2 ],
+        [ "FOR j IN " + c.name() + " COLLECT value = j INTO g = j.haxe RETURN g", 2 ],
+        [ "FOR j IN " + c.name() + " COLLECT value = j INTO g RETURN [ value, g ]", 2 ],
+        [ "FOR j IN " + c.name() + " COLLECT value = j INTO g KEEP j RETURN g", 2 ],
+        [ "FOR j IN [1,2,3] COLLECT value = j RETURN value", 1 ],
+        [ "FOR i IN [1,2,3] FOR j IN [1,2,3] COLLECT value = j RETURN value", 2 ],
+        [ "LET x1 = (FOR j IN [1,2,3] COLLECT value = j RETURN value) LET x2 = (FOR j IN [1,2,3] COLLECT value = j RETURN value) RETURN [x1, x2]", 1 ],
       ];
       
       queries.forEach(function(query) {
-        let plans = db._createStatement({query: query, bindVars: null, options: { allPlans: true, optimizer: { rules: [ "-all" ] }}}).explain().plans;
-        assertEqual(2, plans.length);
+        let plans = db._createStatement({query: query[0], bindVars: null, options: { allPlans: true, optimizer: { rules: [ "-all" ] }}}).explain().plans;
+        assertEqual(query[1], plans.length, query);
       });
     },
 
@@ -239,14 +242,18 @@ function optimizerCollectMethodsTestSuite () {
       c.ensureIndex({ type: "persistent", fields: [ "group", "value" ] });
 
       const queries = [
-        [ "FOR j IN " + c.name() + " COLLECT value = j.group RETURN value", 10 ],
-        [ "FOR j IN " + c.name() + " COLLECT value1 = j.group, value2 = j.value RETURN [ value1, value2 ]", 1500 ],
-        [ "FOR j IN " + c.name() + " COLLECT value = j.group WITH COUNT INTO l RETURN [ value, l ]", 10 ],
-        [ "FOR j IN " + c.name() + " COLLECT value1 = j.group, value2 = j.value WITH COUNT INTO l RETURN [ value1, value2, l ]", 1500 ]
+        { query: "FOR j IN " + c.name() + " COLLECT value = j.group RETURN value", results: 10, sortNodes: 0 },
+        { query: "FOR j IN " + c.name() + " SORT j.group DESC COLLECT value = j.group RETURN value", results: 10, sortNodes: 0 },
+        { query: "FOR j IN " + c.name() + " COLLECT value1 = j.group, value2 = j.value RETURN [ value1, value2 ]", results: 1500, sortNodes: 0 },
+        { query: "FOR j IN " + c.name() + " SORT j.group DESC, j.value DESC COLLECT value1 = j.group, value2 = j.value RETURN [ value1, value2 ]", results: 1500, sortNodes: 0 },
+        { query: "FOR j IN " + c.name() + " SORT j.group DESC, j.value ASC COLLECT value1 = j.group, value2 = j.value RETURN [ value1, value2 ]", results: 1500, sortNodes: 1 },
+        { query: "FOR j IN " + c.name() + " COLLECT value = j.group WITH COUNT INTO l RETURN [ value, l ]", results: 10, sortNodes: 0 },
+        { query: "FOR j IN " + c.name() + " SORT j.group DESC, j.value DESC COLLECT value = j.group WITH COUNT INTO l RETURN [ value, l ]", results: 10, sortNodes: 0 },
+        { query: "FOR j IN " + c.name() + " COLLECT value1 = j.group, value2 = j.value WITH COUNT INTO l RETURN [ value1, value2, l ]", results: 1500, sortNodes: 0 },
       ];
 
       queries.forEach(function(query) {
-        let plan = db._createStatement(query[0]).explain().plan;
+        let plan = db._createStatement({query: query.query, options: {optimizer: {rules: ["-use-index-for-collect"]}}}).explain().plan;
         let aggregateNodes = 0;
         let sortNodes = 0;
         plan.nodes.map(function(node) {
@@ -260,11 +267,11 @@ function optimizerCollectMethodsTestSuite () {
         });
 
         assertEqual(isCluster ? 2 : 1, aggregateNodes);
-        assertEqual(0, sortNodes);
+        assertEqual(query.sortNodes, sortNodes);
 
-        let results = db._query(query[0]);
+        let results = db._query(query.query, {}, {optimizer: {rules: ["-use-index-for-collect"]}});
         let res = results.toArray();
-        assertEqual(query[1], res.length);
+        assertEqual(query.results, res.length);
       });
     },
 
@@ -358,7 +365,7 @@ function optimizerCollectMethodsTestSuite () {
         }
       });
         
-      assertEqual(1, aggregateNodes);
+      assertEqual(isCluster ? 2 : 1, aggregateNodes);
       assertEqual(1, sortNodes);
 
       let result = db._query(query).toArray();
@@ -401,7 +408,7 @@ function optimizerCollectMethodsTestSuite () {
       ];
 
       queries.forEach(function(query) {
-        let plan = db._createStatement(query[0]).explain().plan;
+        let plan = db._createStatement({query: query[0], options: {optimizer: {rules: ["-use-index-for-collect"]}}}).explain().plan;
         let aggregateNodes = 0;
         let sortNodes = 0;
         let hasInto = false;
@@ -418,7 +425,7 @@ function optimizerCollectMethodsTestSuite () {
           }
         });
        
-        assertEqual((isCluster && !hasInto) ? 2 : 1, aggregateNodes);
+        assertEqual(isCluster ? 2 : 1, aggregateNodes);
         assertEqual(query[1] === 'hash' ? 1 : 0, sortNodes);
       });
     },
@@ -456,7 +463,7 @@ function optimizerCollectMethodsTestSuite () {
           }
         });
         
-        assertEqual((isCluster && !hasInto) ? 2 : 1, aggregateNodes);
+        assertEqual(isCluster ? 2 : 1, aggregateNodes);
         assertEqual(1, sortNodes);
       });
     },

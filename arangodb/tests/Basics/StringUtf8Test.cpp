@@ -22,7 +22,6 @@
 /// @author Copyright 2012, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "Basics/Common.h"
 #include "Basics/Utf8Helper.h"
 
 #include "gtest/gtest.h"
@@ -416,4 +415,18 @@ TEST_F(CStringUtf8Test, tst_char_length) {
   const char* test = "დახმარებისთვის";
 
   EXPECT_EQ(14U, TRI_CharLengthUtf8String(test, strlen(test)));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test funny international strings and collation behaviour
+////////////////////////////////////////////////////////////////////////////////
+// Note that this establishes that we have the 3.11 behaviour and the
+// corresponding legacy collation tables.
+
+TEST_F(CStringUtf8Test, tst_funny_international_strings) {
+  const char* left = "三脈山麻桿";
+  const char* right = "三脉山麻杆";
+  EXPECT_LT(arangodb::basics::Utf8Helper::DefaultUtf8Helper.compareUtf8(
+                left, strlen(left), right, strlen(right)),
+            0);
 }

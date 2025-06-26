@@ -1,4 +1,4 @@
-/* global arangodb, print,  db, zeroPad, createSafe, ERRORS, databaseName, createSafe,progress  */
+/* global arangodb, print,  db, zeroPad, ERRORS, progress, createUseDatabaseSafe  */
 
 (function () {
   return {
@@ -10,29 +10,22 @@
       // All items created must contain dbCount
       let localCount = 0;
       if (database !== "_system") {
-        print('050: #ix');
-        let c = zeroPad(localCount + dbCount + options.countOffset);
-        let databaseName = `${database}_${c}`; // TODO: global variable :/
-        if (db._databases().includes(databaseName)) {
+        print(`${Date()} 050: #ix`);
+        db._useDatabase('_system');
+        if (db._databases().includes(database)) {
           // its already there - skip this one.
-          print(`050: skipping ${databaseName} - its already there.`);
+          print(`${Date()} 050: skipping ${database} - its already there.`);
           localCount++;
           return localCount;
         }
-        progress(`050: creating database ${databaseName}`);
+        progress(`050: creating database ${database}`);
         let dbcOptions = {};
-        if (isCluster) {
+        if (isCluster && !options.createOneShardDatabase) {
           dbcOptions = { replicationFactor: 2};
+        } else if (options.createOneShardDatabase) {
+          dbcOptions = { sharding: "single"};
         }
-        createSafe(databaseName,
-                   dbname => {
-                     db._flushCache();
-                     db._createDatabase(dbname, dbcOptions);
-                     return db._useDatabase(dbname);
-                   }, dbname => {
-                     return db._useDatabase(databaseName);
-                   }
-                  );
+        createUseDatabaseSafe(database, dbcOptions);
       } else if (options.numberOfDBs > 1) {
         throw new Error("must specify a database prefix if want to work with multiple DBs.");
       }
@@ -40,34 +33,31 @@
     },
     makeData: function (options, isCluster, isEnterprise, dbCount, loopCount) {
       // All items created must contain dbCount and loopCount
-      print(`050: making data ${dbCount} ${loopCount}`);
+      print(`${Date()} 050: making data ${dbCount} ${loopCount}`);
     },
     checkDataDB: function (options, isCluster, isEnterprise, database, dbCount) {
       // check per DB
       if (database !== "_system") {
-        let c = zeroPad(dbCount + options.countOffset);
-        let databaseName = `${database}_${c}`; // TODO: global variable :/
-        progress(`050: using database ${databaseName}`);
-        db._useDatabase(databaseName);
+        db._useDatabase(database);
       } else if (options.numberOfDBs > 1) {
         throw new Error("050: must specify a database prefix if want to work with multiple DBs.");
       }
       return 0;
     },
     checkData: function (options, isCluster, isEnterprise, dbCount, loopCount) {
-      print(`050: checking data ${dbCount} ${loopCount}`);
+      print(`${Date()} 050: checking data ${dbCount} ${loopCount}`);
     },
     clearDataDB: function (options, isCluster, isEnterprise, database, dbCount) {
+      progress(`050: clearing database ${database}`);
       if (database !== "_system") {
-        let c = zeroPad(dbCount + options.countOffset);
-        let databaseName = `${database}_${c}`; // TODO: global variable :/
         try {
-          db._useDatabase(databaseName);
+          db._useDatabase('_system');
+          db._dropDatabase(database);
         } catch (x) {
           if (x.errorNum === ERRORS.ERROR_ARANGO_DATABASE_NOT_FOUND.code) {
             return 1;
           } else {
-            print(`050: ${x}`);
+            print(`${Date()} 050: ${x}`);
           }
         }
       } else if (options.numberOfDBs > 1) {

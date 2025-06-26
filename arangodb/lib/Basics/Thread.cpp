@@ -28,6 +28,7 @@
 #include <thread>
 
 #include "Basics/operating-system.h"
+#include "Basics/threads-posix.h"
 
 #ifdef TRI_HAVE_UNISTD_H
 #include <unistd.h>
@@ -80,6 +81,10 @@ struct ThreadNumber {
 /// @brief local thread number
 static thread_local ::ThreadNumber LOCAL_THREAD_NUMBER{};
 static thread_local char const* LOCAL_THREAD_NAME = nullptr;
+
+ThreadNameFetcher::ThreadNameFetcher(TRI_tid_t id) noexcept {
+  pthread_getname_np(id, _buffer, 32);
+}
 
 // retrieve the current thread's name. the string view will
 // remain valid as long as the ThreadNameFetcher remains valid.
@@ -150,6 +155,9 @@ void Thread::startThread(void* arg) {
 /// @brief returns the process id
 TRI_pid_t Thread::currentProcessId() { return getpid(); }
 
+/// @brief returns the kernel thread id
+TRI_pid_t Thread::currentKernelThreadId() { return gettid(); }
+
 /// @brief returns the thread process id
 uint64_t Thread::currentThreadNumber() noexcept {
   return LOCAL_THREAD_NUMBER.get();
@@ -181,11 +189,13 @@ std::string Thread::stringify(ThreadState state) {
 }
 
 /// @brief constructs a thread
-Thread::Thread(application_features::ApplicationServer& server,
+Thread::Thread(application_features::ApplicationServer&,
                std::string const& name, bool deleteOnExit,
                std::uint32_t terminationTimeout)
-    : _server(server),
-      _threadStructInitialized(false),
+    : Thread(name, deleteOnExit, terminationTimeout) {}
+Thread::Thread(std::string const& name, bool deleteOnExit,
+               std::uint32_t terminationTimeout)
+    : _threadStructInitialized(false),
       _refs(0),
       _name(name),
       _thread(),
@@ -243,27 +253,7 @@ void Thread::shutdown() {
       // we must ignore any errors here, but TRI_DetachThread will log them
       TRI_DetachThread(&_thread);
     } else {
-#ifdef __APPLE__
-      // MacOS does not provide an implemenation of pthread_timedjoin_np which
-      // is used in TRI_JoinThreadWithTimeout, so instead we simply wait for
-      // _state to be set to STOPPED.
-
-      std::uint32_t n = _terminationTimeout / 100;
-      for (std::uint32_t i = 0; i < n || _terminationTimeout == INFINITE; ++i) {
-        if (_state.load() == ThreadState::STOPPED) {
-          break;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      }
-
-      // we still have to wait here until the thread has terminated, but this
-      // should happen immediately after _state has been set to STOPPED!
-      auto ret = _state.load() == ThreadState::STOPPED
-                     ? TRI_JoinThread(&_thread)
-                     : TRI_ERROR_FAILED;
-#else
       auto ret = TRI_JoinThreadWithTimeout(&_thread, _terminationTimeout);
-#endif
 
       if (ret != TRI_ERROR_NO_ERROR) {
         LOG_TOPIC("825a5", FATAL, arangodb::Logger::FIXME)
@@ -278,21 +268,15 @@ void Thread::shutdown() {
 
 /// @brief checks if the current thread was asked to stop
 bool Thread::isStopping() const noexcept {
-  auto state = _state.load(std::memory_order_relaxed);
-
+  // need acquire to ensure we establish a happens before relation with the
+  // update that updates _state, so threads that wait for isStopping to return
+  // true are properly synchronized
+  auto state = _state.load(std::memory_order_acquire);
   return state == ThreadState::STOPPING || state == ThreadState::STOPPED;
 }
 
 /// @brief starts the thread
 bool Thread::start(ConditionVariable* finishedCondition) {
-  if (!isSystem() && !_server.isPrepared()) {
-    LOG_TOPIC("6ba8a", FATAL, arangodb::Logger::FIXME)
-        << "trying to start a thread '" << _name
-        << "' before prepare has finished, current state: "
-        << (int)_server.state();
-    FATAL_ERROR_ABORT();
-  }
-
   _finishedCondition = finishedCondition;
   ThreadState state = _state.load();
 

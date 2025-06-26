@@ -831,6 +831,35 @@ const IndexJoinTestSuite = function () {
       assertEqual(nodes.indexOf("JoinNode"), -1);
     },
 
+    testJoinWithPrimaryIndexProjections: function () {
+      const A = createCollection("A", ["_key"]);
+      fillCollection("A", singleAttributeGenerator(20, "_key", x => `${x}`));
+      A.ensureIndex({type: "persistent", fields: ["x", "y"]});
+      const documentIdsOfA = [];
+      A.all().toArray().forEach((document) => {
+        documentIdsOfA.push(document._id);
+      });
+      fillEdgeCollectionWith("B", documentIdsOfA);
+
+      // Using the attribute _id causes the primary index to reject the streaming request.
+      // Thus, we expect no join to be created.
+      const query = `
+          FOR doc1 IN A
+          SORT doc1._key
+            FOR doc2 IN B
+            FILTER doc1._key == doc2.x
+            RETURN [doc1, doc2.x, doc1._id]
+        `;
+
+      let plan = db._createStatement({
+        query: query,
+        bindVars: null,
+        options: queryOptions
+      }).explain().plan;
+      let nodes = plan.nodes.map(x => x.type);
+      assertEqual(nodes.indexOf("JoinNode"), -1);
+    },
+
     testJoinMultipleJoins: function () {
       const A1 = createCollection("A1", ["x"], "prototype1");
       A1.ensureIndex({type: "persistent", fields: ["x"]});
@@ -1082,10 +1111,10 @@ const IndexJoinTestSuite = function () {
     testLateMaterialized: function () {
       const A = createCollection("A", ["x"]);
       A.ensureIndex({type: "persistent", fields: ["x"]});
-      fillCollection("A", singleAttributeGenerator(20, "x", x => `${x}`));
+      fillCollection("A", singleAttributeGenerator(100, "x", x => `${x}`));
       const B = createCollection("B", ["x"]);
       B.ensureIndex({type: "persistent", fields: ["x"]});
-      fillCollection("B", singleAttributeGenerator(20, "x", x => `${x}`));
+      fillCollection("B", singleAttributeGenerator(100, "x", x => `${x}`));
 
       const query = `
         for doc1 in A
@@ -1095,7 +1124,6 @@ const IndexJoinTestSuite = function () {
             limit 20
             return [doc1.x, doc2]
       `;
-
       const plan = db._createStatement({query, options: queryOptions}).explain().plan;
       const nodes = plan.nodes.map(x => x.type);
 
@@ -1110,13 +1138,155 @@ const IndexJoinTestSuite = function () {
       assertEqual(join.indexInfos[1].producesOutput, true);
       assertEqual(join.indexInfos[1].indexCoversProjections, true);
 
-
-      const result = db._createStatement(query).execute().toArray();
+      const cursor = db._createStatement(query).execute();
+      const result = cursor.toArray();
       assertEqual(result.length, 20);
       for (const [a, b] of result) {
         assertEqual(a, b.x);
       }
+
+      assertEqual(cursor.getExtra().stats.documentLookups, 100);
     },
+
+    testLateMaterializedPushPastJoin: function () {
+      const A = createCollection("A", ["x"]);
+      A.ensureIndex({type: "persistent", fields: ["x"], storedValues: ["z"]});
+      fillCollection("A", attributeGenerator(100, {x: x => `${x}`, z: x => 0}));
+      const B = createCollection("B", ["x"]);
+      B.ensureIndex({type: "persistent", fields: ["x"]});
+      fillCollection("B", singleAttributeGenerator(100, "x", x => `${x}`));
+
+      const query = `
+        for doc1 in A
+          sort doc1.x
+          for doc2 in B
+            filter doc2.x == doc1.x
+            sort doc2.x
+            limit 20
+            filter doc1.z == 0
+            return [doc1, doc2]
+      `;
+      const plan = db._createStatement({query, options: queryOptions}).explain().plan;
+      const nodes = plan.nodes.map(x => x.type);
+
+      assertEqual(nodes.indexOf("JoinNode"), 1);
+      const join = plan.nodes[1];
+      assertEqual(join.type, "JoinNode");
+
+      assertEqual(join.indexInfos.length, 2);
+      assertEqual(normalize(join.indexInfos[0].projections), [["z"]]);
+      assertEqual(normalize(join.indexInfos[1].projections), [["x"]]);
+      assertEqual(join.indexInfos[0].isLateMaterialized, true);
+      assertEqual(join.indexInfos[0].producesOutput, true);
+      assertEqual(join.indexInfos[0].indexCoversProjections, true);
+      assertEqual(join.indexInfos[1].isLateMaterialized, true);
+      assertEqual(join.indexInfos[1].producesOutput, true);
+      assertEqual(join.indexInfos[1].indexCoversProjections, true);
+
+      // We expect the materialize nodes to be pushed past the limit node
+      const relevantNodes = nodes.filter(x =>
+          ["LimitNode", "MaterializeNode", "FilterNode", "RemoteNode"].indexOf(x) !== -1);
+      if (isCluster) {
+        assertEqual(relevantNodes, ["LimitNode", "MaterializeNode", "MaterializeNode",
+          "RemoteNode", "LimitNode", "FilterNode"]);
+      } else {
+        assertEqual(relevantNodes, ["LimitNode", "FilterNode", "MaterializeNode", "MaterializeNode"]);
+      }
+
+      const result = db._createStatement(query).execute().toArray();
+      assertEqual(result.length, 20);
+      for (const [a, b] of result) {
+        assertEqual(a.x, b.x);
+      }
+    },
+
+    testUniqueStreamProperty: function () {
+      const A = createCollection("A", ["x"]);
+      A.ensureIndex({type: "persistent", fields: ["y", "z", "x"], unique: true});
+      fillCollection("A", attributeGenerator(100, {x: x => x, y: x => x, z: x => x}));
+      const C = createCollection("C", ["z"]);
+      C.ensureIndex({type: "persistent", fields: ["y", "z", "x"], unique: true});
+      fillCollection("C", attributeGenerator(100, {x: x => x, y: x => x, z: x => x}));
+      const B = createCollection("B", ["x"]);
+      B.ensureIndex({type: "persistent", fields: ["x"], unique: true});
+      fillCollection("B", singleAttributeGenerator(100, "x", x => x));
+
+      {
+        const query = `
+        FOR a IN A
+          FOR b in B
+            FILTER a.z == 12 && a.y == 12 && b.x == a.x
+            RETURN [a, b]
+      `;
+
+        const plan = db._createStatement({query}).explain().plan;
+        const nodes = plan.nodes.map(x => x.type);
+
+        assertEqual(nodes.indexOf("JoinNode"), 1);
+        const join = plan.nodes[1];
+        assertEqual(join.type, "JoinNode");
+
+        assertEqual(join.indexInfos.length, 2);
+        assertTrue(join.indexInfos[0].isUniqueStream);
+        assertTrue(join.indexInfos[1].isUniqueStream);
+
+        const result = db._createStatement(query).execute().toArray();
+        assertEqual(result.length, 1);
+        const [a, b] = result[0];
+        assertEqual(a.z, 12);
+        assertEqual(b.x, 12);
+      }
+
+      {
+        const query = `
+        FOR a IN C
+          FOR b in B
+            FILTER a.y == 12 && b.x == a.z
+            RETURN [a, b]
+      `;
+
+        const plan = db._createStatement({query}).explain().plan;
+        const nodes = plan.nodes.map(x => x.type);
+
+        assertEqual(nodes.indexOf("JoinNode"), 1);
+        const join = plan.nodes[1];
+        assertEqual(join.type, "JoinNode");
+
+        assertEqual(join.indexInfos.length, 2);
+        assertNotEqual(join.indexInfos[0].isUniqueStream, true);
+        assertTrue(join.indexInfos[1].isUniqueStream);
+
+        const result = db._createStatement(query).execute().toArray();
+        assertEqual(result.length, 1);
+        const [a, b] = result[0];
+        assertEqual(a.z, 12);
+        assertEqual(b.x, 12);
+      }
+
+      {
+        const query = `
+        FOR a IN C
+          FOR b in B
+            FILTER a.y == "DOES NOT EXIST" && b.x == a.z
+            RETURN [a, b]
+      `;
+
+        const plan = db._createStatement({query}).explain().plan;
+        const nodes = plan.nodes.map(x => x.type);
+
+        assertEqual(nodes.indexOf("JoinNode"), 1);
+        const join = plan.nodes[1];
+        assertEqual(join.type, "JoinNode");
+
+        assertEqual(join.indexInfos.length, 2);
+        assertNotEqual(join.indexInfos[0].isUniqueStream, true);
+        assertTrue(join.indexInfos[1].isUniqueStream);
+
+        const result = db._createStatement(query).execute().toArray();
+        assertEqual(result.length, 0);
+      }
+    }
+
   };
 };
 

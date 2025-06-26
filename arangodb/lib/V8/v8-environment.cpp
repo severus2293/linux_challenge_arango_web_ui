@@ -34,16 +34,10 @@
 
 #include "ApplicationFeatures/ApplicationServer.h"
 #include "V8/V8SecurityFeature.h"
-#include "Basics/Common.h"
 #include "Basics/debugging.h"
 #include "V8/v8-globals.h"
 
-#ifdef __APPLE__
-#include <crt_externs.h>
-#define environ (*_NSGetEnviron())
-#else
 extern char** environ;
-#endif
 
 static bool canExpose(v8::Isolate* isolate, v8::Local<v8::Name> property) {
   if (property->IsSymbol()) {

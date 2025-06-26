@@ -395,13 +395,17 @@ class TtlThread final : public ServerThread<ArangodServer> {
               std::min(properties.maxCollectionRemoves, limitLeft);
 
           while (leftForCurrentCollection > 0) {
-            // don't let query runtime restrictions affect the lookup query
             aql::QueryOptions options;
+            // don't let query runtime restrictions affect the lookup query
             options.maxRuntime = 0.0;
+            // no need to make the lookup query appear in the audit log
+            // every time we do a potential TTL index purge
+            options.skipAudit = true;
 
+            TRI_ASSERT(bindVars->slice().hasKey("@collection"));
             auto query = aql::Query::create(
                 transaction::StandaloneContext::create(*vocbase, origin),
-                aql::QueryString(::lookupQuery), std::move(bindVars), options);
+                aql::QueryString(::lookupQuery), bindVars, options);
             query->collections().add(collection->name(), AccessMode::Type::READ,
                                      aql::Collection::Hint::Shard);
             aql::QueryResult queryResult = query->executeSync();
@@ -479,8 +483,6 @@ class TtlThread final : public ServerThread<ArangodServer> {
               reqOptions.database = collection->vocbase().name();
               reqOptions.timeout = network::Timeout(30.0);
 
-              network::Headers headers = network::addAuthorizationHeader({});
-
               // pick next coordinator in list (round robin)
               TRI_ASSERT(!coordinators.empty());
               auto const& coordinator =
@@ -491,8 +493,8 @@ class TtlThread final : public ServerThread<ArangodServer> {
                   "/_api/document/", basics::StringUtils::urlEncode(cname));
               auto f = network::sendRequestRetry(
                   pool, "server:" + coordinator, fuerte::RestVerb::Delete, url,
-                  std::move(*queryResult.data->steal()), reqOptions, headers);
-              auto& val = f.get();
+                  std::move(*queryResult.data->steal()), reqOptions);
+              auto& val = f.waitAndGet();
               Result res = val.combinedResult();
 
               if (res.fail()) {

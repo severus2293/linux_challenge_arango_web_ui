@@ -24,7 +24,6 @@
 #pragma once
 
 #include "Basics/AttributeNameParser.h"
-#include "Basics/Common.h"
 #include "Indexes/Index.h"
 #include "RocksDBEngine/RocksDBCuckooIndexEstimator.h"
 #include "RocksDBEngine/RocksDBKeyBounds.h"
@@ -107,6 +106,9 @@ class RocksDBIndex : public Index {
 
   void setupCache();
   void destroyCache() noexcept;
+
+  virtual void prepareIndex(std::unique_ptr<rocksdb::Iterator> it,
+                            rocksdb::Slice upper, RocksDBMethods* methods) {}
 
   /// performs a preflight check for an insert operation, not carrying out any
   /// modifications to the index.

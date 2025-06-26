@@ -25,8 +25,8 @@
 
 #include "Aql/ExecutionNodeId.h"
 #include "Aql/RegisterId.h"
-#include "Basics/debugging.h"
-#include "Cluster/ClusterTypes.h"
+#include "Aql/RegIdFlatSet.h"
+#include "Basics/RebootId.h"
 #include "Containers/HashSetFwd.h"
 
 #include <cstdint>
@@ -37,22 +37,9 @@
 #include <unordered_map>
 #include <vector>
 
-namespace boost {
-namespace container {
-template<class T>
-class new_allocator;
-template<class Key, class Compare, class AllocatorOrContainer>
-class flat_set;
-}  // namespace container
-}  // namespace boost
+#include <absl/container/flat_hash_map.h>
 
 namespace arangodb {
-
-namespace containers {
-template<class Key, class Compare = std::less<Key>,
-         class AllocatorOrContainer = boost::container::new_allocator<Key>>
-using flat_set = boost::container::flat_set<Key, Compare, AllocatorOrContainer>;
-}
 
 namespace aql {
 struct Collection;
@@ -61,8 +48,8 @@ struct Collection;
 using VariableId = uint32_t;
 
 /// @brief type of a query id
-typedef uint64_t QueryId;
-typedef uint64_t EngineId;
+using QueryId = uint64_t;
+using EngineId = uint64_t;
 
 // Map RemoteID->ServerID->[SnippetId]
 using MapRemoteToSnippet = std::unordered_map<
@@ -95,9 +82,10 @@ using RegIdSet = containers::HashSet<RegisterId>;
 using RegIdSetStack = std::vector<RegIdSet>;
 using RegIdOrderedSet = std::set<RegisterId>;
 using RegIdOrderedSetStack = std::vector<RegIdOrderedSet>;
-// Note: #include <boost/container/flat_set.hpp> to use the following types
-using RegIdFlatSet = containers::flat_set<RegisterId>;
 using RegIdFlatSetStack = std::vector<containers::flat_set<RegisterId>>;
+
+using BindParameterVariableMapping =
+    absl::flat_hash_map<std::string, Variable const*>;
 
 }  // namespace aql
 
@@ -107,6 +95,6 @@ class BaseEngine;
 using GraphEngineList = std::vector<std::unique_ptr<BaseEngine>>;
 }  // namespace traverser
 
-enum class ExplainRegisterPlan { No = 0, Yes };
+enum class ExplainRegisterPlan : uint8_t { No = 0, Yes };
 
 }  // namespace arangodb

@@ -29,7 +29,6 @@
 #include "Aql/AqlCall.h"
 #include "Aql/AqlCallSet.h"
 #include "Aql/AqlCallStack.h"
-#include "Aql/AqlItemBlockInputRange.h"
 #include "Aql/DependencyProxy.h"
 #include "Aql/ExecutionBlock.h"
 #include "Aql/Stats.h"
@@ -43,6 +42,12 @@
 
 namespace arangodb {
 class ExecContext;
+namespace futures {
+template<typename T>
+class Future;
+
+struct Unit;
+}  // namespace futures
 }  // namespace arangodb
 
 namespace arangodb::aql {
@@ -56,6 +61,7 @@ class IdExecutor;
 
 struct AqlCall;
 class AqlItemBlock;
+class AqlItemBlockInputRange;
 class ExecutionEngine;
 class ExecutionNode;
 class InputAqlItemRow;
@@ -68,6 +74,7 @@ class MultiDependencySingleRowFetcher;
 class RegisterInfos;
 class SubqueryStartExecutor;
 class SubqueryEndExecutor;
+class EnumerateNearVectorsExecutor;
 
 template<typename T, typename... Es>
 constexpr bool is_one_of_v = (std::is_same_v<T, Es> || ...);
@@ -234,6 +241,8 @@ class ExecutionBlockImpl final : public ExecutionBlock {
   auto testInjectInputRange(DataRange range, SkipResult skipped) -> void;
 #endif
 
+  void stopAsyncTasks() override;
+
  private:
   struct ExecutionContext {
     ExecutionContext(ExecutionBlockImpl& block, AqlCallStack const& callstack);
@@ -315,6 +324,11 @@ class ExecutionBlockImpl final : public ExecutionBlock {
   // as soon as we reach a place where there is no skip
   // ordered in the outer shadow rows, this call
   // will fall back to shadowRowForwarding.
+  // We need to make this method a template to prevent it from being implicitly
+  // instantiated for explicit ExecutionBlockImpl instantiations, because that
+  // would cause the static assert in the implementation to fail for executors
+  // that don't have side effects.
+  template<class E = Executor>
   [[nodiscard]] auto sideEffectShadowRowForwarding(AqlCallStack& stack,
                                                    SkipResult& skipResult)
       -> ExecState;
@@ -400,6 +414,8 @@ class ExecutionBlockImpl final : public ExecutionBlock {
 
     ExecutionBlockImpl& _block;
     AqlCallStack _stack;
+    mutable std::atomic<uint64_t> _numberWaiters{0};
+    mutable std::atomic<bool> _logStacktrace{false};
   };
 
   /**
@@ -447,7 +463,7 @@ class ExecutionBlockImpl final : public ExecutionBlock {
       LogContext logContext;
     };
 
-    void run(std::unique_ptr<ExecContext> execContext);
+    void run(std::shared_ptr<ExecContext const> execContext);
     std::atomic<State> _state{State::Waiting};
     Params* _params;
     ExecutionBlockImpl& _block;

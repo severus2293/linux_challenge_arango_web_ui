@@ -35,14 +35,7 @@
 #include <unicode/umachine.h>
 #include <unicode/regex.h>
 
-#include "Basics/Common.h"
-
-namespace icu_58 {
-class RegexMatcher;
-}
-
-namespace arangodb {
-namespace basics {
+namespace arangodb::basics {
 
 enum class LanguageType { INVALID, DEFAULT, ICU };
 
@@ -51,17 +44,22 @@ class Utf8Helper {
   Utf8Helper& operator=(Utf8Helper const&) = delete;
 
  public:
+  // The following singleton is used in various places, in particular
+  // in the LanguageFeature. When it is constructed before main(), we
+  // do not yet have the ICU data available, so we cannot really initialize
+  // it and set a collator language. This is then done in the `LanguageFeature`
+  // in its `prepare` method. Therefore we do not initialize the collator
+  // in the constructor! Do not use this singleton before the LanguageFeature
+  // has initialized it.
   static Utf8Helper DefaultUtf8Helper;
 
   //////////////////////////////////////////////////////////////////////////////
   /// @brief constructor
-  /// @param lang   Lowercase two-letter or three-letter ISO-639 code.
-  ///     This parameter can instead be an ICU style C locale (e.g. "en_US")
   //////////////////////////////////////////////////////////////////////////////
 
-  explicit Utf8Helper(std::string const& lang);
-
-  Utf8Helper();
+  Utf8Helper() = delete;     // avoid accidental use
+  explicit Utf8Helper(int);  // the int is just to distinguish this constructor
+                             // and to use it for DefaultUtf8Helper above.
 
   ~Utf8Helper();
 
@@ -199,8 +197,8 @@ class Utf8Helper {
  private:
   std::unique_ptr<icu_64_64::Collator> _coll;
 };
-}  // namespace basics
-}  // namespace arangodb
+
+}  // namespace arangodb::basics
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief convert a utf-8 string to a uchar (utf-16)

@@ -38,18 +38,23 @@
 #include "Aql/AqlFunctionFeature.h"
 #include "Aql/Ast.h"
 #include "Aql/ExecutionPlan.h"
-#include "Aql/IResearchViewNode.h"
 #include "Aql/Query.h"
 #include "Aql/SortCondition.h"
+#include "Cluster/ClusterFeature.h"
 #include "IResearch/AqlHelper.h"
 #include "IResearch/IResearchCommon.h"
 #include "IResearch/IResearchFeature.h"
+#include "IResearch/IResearchFilterContext.h"
 #include "IResearch/IResearchOrderFactory.h"
 #include "RestServer/AqlFeature.h"
 #include "RestServer/DatabaseFeature.h"
+#include "RestServer/VectorIndexFeature.h"
+#include "Metrics/ClusterMetricsFeature.h"
 #include "Metrics/MetricsFeature.h"
 #include "RestServer/QueryRegistryFeature.h"
 #include "RestServer/ViewTypesFeature.h"
+#include "Statistics/StatisticsFeature.h"
+#include "Statistics/StatisticsWorker.h"
 #include "StorageEngine/EngineSelectorFeature.h"
 #include "Transaction/Methods.h"
 #include "Transaction/StandaloneContext.h"
@@ -281,7 +286,17 @@ class IResearchOrderTest
     selector.setEngineTesting(&engine);
     features.emplace_back(selector, false);
     features.emplace_back(
-        server.addFeature<arangodb::metrics::MetricsFeature>(), false);
+        server.addFeature<arangodb::metrics::MetricsFeature>(
+            arangodb::LazyApplicationFeatureReference<
+                arangodb::QueryRegistryFeature>(server),
+            arangodb::LazyApplicationFeatureReference<
+                arangodb::StatisticsFeature>(nullptr),
+            selector,
+            arangodb::LazyApplicationFeatureReference<
+                arangodb::metrics::ClusterMetricsFeature>(nullptr),
+            arangodb::LazyApplicationFeatureReference<arangodb::ClusterFeature>(
+                nullptr)),
+        false);
     features.emplace_back(server.addFeature<arangodb::AqlFeature>(), true);
     features.emplace_back(
         server.addFeature<arangodb::QueryRegistryFeature>(
@@ -291,6 +306,8 @@ class IResearchOrderTest
                           false);  // required for IResearchFeature
     features.emplace_back(
         server.addFeature<arangodb::aql::AqlFunctionFeature>(), true);
+    features.emplace_back(server.addFeature<arangodb::VectorIndexFeature>(),
+                          false);
     {
       auto& feature =
           features

@@ -26,12 +26,13 @@
 #include "Aql/BlocksWithClients.h"
 #include "Aql/Collection.h"
 #include "Aql/ExecutionEngine.h"
-#include "Aql/ExecutionNode.h"
+#include "Aql/ExecutionNode/ExecutionNode.h"
 #include "Aql/Query.h"
 #include "Aql/SharedQueryState.h"
 #include "Logger/LogMacros.h"
 #include "Logger/Logger.h"
 #include "VocBase/ticks.h"
+#include "VocBase/vocbase.h"
 
 using namespace arangodb;
 using namespace arangodb::aql;
@@ -97,6 +98,7 @@ EngineInfoContainerCoordinator::~EngineInfoContainerCoordinator() = default;
 void EngineInfoContainerCoordinator::addNode(ExecutionNode* node) {
   TRI_ASSERT(node->getType() != ExecutionNode::INDEX &&
              node->getType() != ExecutionNode::ENUMERATE_COLLECTION &&
+             node->getType() != ExecutionNode::ENUMERATE_NEAR_VECTORS &&
              node->getType() != ExecutionNode::JOIN);
 
   TRI_ASSERT(!_engines.empty());

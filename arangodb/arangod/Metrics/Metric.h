@@ -23,7 +23,6 @@
 #pragma once
 
 #include "RestServer/counter.h"
-#include "RestServer/arangod.h"
 
 #include <iosfwd>
 #include <string_view>
@@ -60,8 +59,7 @@ class Metric {
   //////////////////////////////////////////////////////////////////////////////
   virtual void toPrometheus(std::string& result, std::string_view globals,
                             bool ensureWhitespace) const = 0;
-  virtual void toVPack(velocypack::Builder& builder,
-                       ArangodServer& server) const;
+  virtual void toVPack(velocypack::Builder& builder) const = 0;
 
   void setDynamic() noexcept { _dynamic = true; }
 

@@ -1,4 +1,4 @@
-/* global print, semver, db, progress, createSafe */
+/* global print, semver, db, progress, createUseDatabaseSafe */
 
 (function () {
   let extendedDbNames = ["ᇤ፼ᢟ⚥㑸ন", "に楽しい新習慣", "うっとりとろける", "זַרקוֹר", "ስፖትላይት", "بقعة ضوء", "ուշադրության կենտրոնում", "🌸🌲🌵 🍃💔"];
@@ -10,46 +10,44 @@
     },
 
     makeDataDB: function (options, isCluster, isEnterprise, database, dbCount) {
-      print("051: Create databases with unicode symbols in the name");
+      print(`${Date()} 051: Create databases with unicode symbols in the name`);
       let baseName = database;
       if (baseName === "_system") {
         baseName = "system";
+      } else {
+        print(`${Date()} 051: skipping creation of per database data, since database is not _system`);
+        return 0;
       }
       db._useDatabase("_system");
       for (let i in extendedDbNames) {
         let unicodeName = extendedDbNames[i];
         let databaseName = `${baseName}_${dbCount}_${unicodeName}`;
         progress('051: Start creating database ' + databaseName);
-        if (db._databases().includes(databaseName)) {
-        // its already there - skip this one.
-          print(`051: skipping ${databaseName} - its already there.`);
-          break;
-        }
         let dbcOptions = {};
         if (isCluster) {
           dbcOptions = { replicationFactor: 2};
         }
-        createSafe(databaseName,
-          dbname => {
-              db._flushCache();
-              db._createDatabase(dbname, dbcOptions);
-          }
-          );
+        createUseDatabaseSafe(databaseName, dbcOptions);
       }
       return 0;
     },
     checkDataDB: function (options, isCluster, isEnterprise, database, dbCount, readOnly) {
       // check per DB
+      db._useDatabase('_system');
+      const allDatabases = db._databases();
       let baseName = database;
       if (baseName === "_system") {
         baseName = "system";
+      } else {
+        print(`${Date()} 051: skipping checking of per database data, since database is not _system`);
+        return 0;
       }
       progress("051: Test databases with extended unicode symbols in the name");
       for (let i in extendedDbNames) {
         let unicodeName = extendedDbNames[i];
         let databaseName = `${baseName}_${dbCount}_${unicodeName}`;
         progress('051: Checking the existence of the database: ' + databaseName);
-        if (!(db._databases().includes(databaseName))) {
+        if (!(allDatabases.includes(databaseName))) {
           throw new Error("051: Database does not exist: " + databaseName + "have: " + db._databases());
         }
       }
@@ -57,16 +55,19 @@
       return 0;
     },
     clearDataDB: function (options, isCluster, isEnterprise, database, dbCount) {
-      progress(`051: Delete databases with unicode symbols in the name ${database} ${dbCount}`);
+      print(`${Date()} 051: Delete databases with unicode symbols in the name ${database} ${dbCount}`);
       if (database === "_system") {
         database = "system";
+      } else {
+        print(`${Date()} 051: skipping deletion of per database data, since database is not _system`);
+        return 0;
       }
       let baseName = database;
       for (let i in extendedDbNames) {
         let unicodeName = extendedDbNames[i];
         let databaseName = `${baseName}_${dbCount}_${unicodeName}`;
         db._useDatabase('_system');
-        print(`051: dropping ${databaseName}`);
+        print(`${Date()} 051: dropping ${databaseName}`);
         db._dropDatabase(databaseName);
       }
       return 0;

@@ -28,6 +28,7 @@
 #include "Aql/AqlTransaction.h"
 #include "Aql/ExpressionContext.h"
 #include "Aql/Expression.h"
+#include "Aql/LazyConditions.h"
 #include "Aql/Optimizer.h"
 #include "Aql/OptimizerRule.h"
 #include "Aql/Parser.h"
@@ -188,7 +189,10 @@ class CalculationQueryContext final : public arangodb::aql::QueryContext {
     _trx->addHint(arangodb::transaction::Hints::Hint::FROM_TOPLEVEL_AQL);
     _trx->addHint(arangodb::transaction::Hints::Hint::
                       SINGLE_OPERATION);  // to avoid taking db snapshot
-    _trx->begin();
+    auto res = _trx->begin();
+    if (res.fail()) {
+      throw basics::Exception(std::move(res));
+    }
   }
 
   arangodb::aql::QueryOptions const& queryOptions() const override {
@@ -270,6 +274,14 @@ Result StandaloneCalculation::validateQuery(
     TRI_ASSERT(ast);
     auto qs = arangodb::aql::QueryString(queryString);
     Parser parser(queryContext, *ast, qs);
+    if (isComputedValue) {
+      // force the condition of the ternary operator (condition ? truePart :
+      // falsePart) to be always inlined and not be extracted into its own LET
+      // node. if we don't set this boolean flag here, then a ternary operator
+      // could create additional LET nodes, which is not supported inside
+      // computed values.
+      parser.lazyConditions().pushForceInline();
+    }
     parser.parse();
     ast->validateAndOptimize(
         queryContext.trxForOptimization(),

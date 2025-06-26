@@ -23,8 +23,6 @@
 
 #pragma once
 
-#include "Basics/Common.h"
-
 #include "Basics/StaticStrings.h"
 #include "Basics/StringUtils.h"
 #include "Basics/voc-errors.h"
@@ -162,6 +160,8 @@ class GeneralResponse {
   }
 
   virtual size_t bodySize() const = 0;
+
+  virtual void clearBody() noexcept = 0;
 
   /// used for head
   bool generateBody() const noexcept { return _generateBody; }

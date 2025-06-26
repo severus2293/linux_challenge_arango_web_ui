@@ -9,39 +9,43 @@ import { QueryContextProvider, useQueryContext } from "./QueryContextProvider";
 import { QueryFullGraphView } from "./queryGraph/QueryFullGraphView";
 import { RunningQueries } from "./runningQueries/RunningQueries";
 import { SlowQueryHistory } from "./slowQueries/SlowQueryHistory";
+import { useNavbarHeight } from "../useNavbarHeight";
 
 export const QueryViewWrap = () => {
   useDisableNavBar();
   useGlobalStyleReset();
   return (
-    <ChakraCustomProvider overrideNonReact>
-      <QueryContextProvider>
-        <HashRouter basename="/" hashType={"noslash"}>
-          <Switch>
-            <Route path="/queries">
-              <QueryViewWrapInner />
-            </Route>
-          </Switch>
-        </HashRouter>
-      </QueryContextProvider>
-    </ChakraCustomProvider>
+    <Box width="100%">
+      <ChakraCustomProvider overrideNonReact>
+        <QueryContextProvider>
+          <HashRouter basename="/" hashType={"noslash"}>
+            <Switch>
+              <Route path="/queries">
+                <QueryViewWrapInner />
+              </Route>
+            </Switch>
+          </HashRouter>
+        </QueryContextProvider>
+      </ChakraCustomProvider>
+    </Box>
   );
 };
 
 const QueryViewWrapInner = () => {
   const { queryGraphResult } = useQueryContext();
+  const navbarHeight = useNavbarHeight();
   if (queryGraphResult && queryGraphResult.result) {
     return <QueryFullGraphView />;
   }
   return (
-    <Box width="full" height="calc(100vh - 60px)" overflow="auto">
+    <Box width="full" height={`calc(100vh - ${navbarHeight}px)`} overflow="auto">
       <Tabs size="sm" height="full" isLazy>
         <TabList>
           <Tab>Editor</Tab>
           <Tab>Running Queries</Tab>
           <Tab>Slow Query History</Tab>
         </TabList>
-        <TabPanels height="calc(100% - 60px)">
+        <TabPanels height="calc(100% - 40px)" overflow="auto">
           <TabPanel height="full">
             <QueryEditorPane />
           </TabPanel>

@@ -41,7 +41,9 @@ let promtoolPath = internal.env[PATH];
 if (!promtoolPath) {
   promtoolPath = '.';
 }
-promtoolPath = fs.join(promtoolPath, 'promtool' + pu.executableExt);
+if (fs.isDirectory(promtoolPath)) {
+  promtoolPath = fs.join(promtoolPath, 'promtool' + pu.executableExt);
+}
 
 const metricsUrlPath = "/_admin/metrics/v2";
 const serverIdPath = "/_admin/server/id";
@@ -176,9 +178,6 @@ function validateMetricsViaCoordinator(coordinator, server) {
 function promtoolClusterSuite() {
   'use strict';
 
-  if (!internal.env.hasOwnProperty('INSTANCEINFO')) {
-    throw new Error('env.INSTANCEINFO was not set by caller!');
-  }
   let dbServers = global.instanceManager.arangods.filter(arangod => arangod.instanceRole === "dbserver");
   let agents = global.instanceManager.arangods.filter(arangod => arangod.instanceRole === "agent");
   let coordinators = global.instanceManager.arangods.filter(arangod => arangod.instanceRole === "coordinator");

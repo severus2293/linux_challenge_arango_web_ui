@@ -24,7 +24,6 @@
 
 #pragma once
 
-#include "Basics/Common.h"
 #include "RocksDBEngine/RocksDBTypes.h"
 #include "VocBase/vocbase.h"
 
@@ -174,6 +173,12 @@ class RocksDBKeyBounds {
   /// index (hash, skiplist and permanent)
   //////////////////////////////////////////////////////////////////////////////
   static RocksDBKeyBounds MdiVPackIndex(uint64_t indexId);
+
+  //////////////////////////////////////////////////////////////////////////////
+  /// @brief Bounds for all index-entries belonging to a specified non-unique
+  /// index (hash, skiplist and permanent)
+  //////////////////////////////////////////////////////////////////////////////
+  static RocksDBKeyBounds VectorVPackIndex(uint64_t indexId);
 
  public:
   RocksDBKeyBounds(RocksDBKeyBounds const& other);

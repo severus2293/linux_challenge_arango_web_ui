@@ -331,7 +331,7 @@ bool Inception::restartingActiveAgent() {
 
       auto comres = network::sendRequest(cp, p, fuerte::RestVerb::Post, path,
                                          greetBuffer, reqOpts)
-                        .get();
+                        .waitAndGet();
 
       if (comres.ok() && comres.statusCode() == fuerte::StatusOK) {
         VPackSlice const theirConfig = comres.slice();
@@ -365,7 +365,7 @@ bool Inception::restartingActiveAgent() {
 
         auto comres = network::sendRequest(cp, p.second, fuerte::RestVerb::Post,
                                            path, greetBuffer, reqOpts)
-                          .get();
+                          .waitAndGet();
 
         if (comres.combinedResult().ok()) {
           try {
@@ -399,7 +399,7 @@ bool Inception::restartingActiveAgent() {
                 comres = network::sendRequest(cp, theirLeaderEp,
                                               fuerte::RestVerb::Post, path,
                                               greetBuffer, reqOpts)
-                             .get();
+                             .waitAndGet();
 
                 // Failed to contact leader move on until we do. This way at
                 // least we inform everybody individually of the news.
@@ -472,7 +472,10 @@ bool Inception::restartingActiveAgent() {
             if (!this->isStopping()) {
               LOG_TOPIC("e971a", FATAL, Logger::AGENCY)
                   << "Assumed active RAFT peer has no active agency list: "
-                  << e.what() << ", administrative intervention needed.";
+                  << e.what()
+                  << ", administrative intervention needed. "
+                     "comres: "
+                  << comres.slice().toJson();
               FATAL_ERROR_EXIT();
             }
             return false;

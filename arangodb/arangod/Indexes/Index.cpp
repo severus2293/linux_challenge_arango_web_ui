@@ -21,22 +21,13 @@
 /// @author Jan Steemann
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <iostream>
-#include <limits>
-
-#include <date/date.h>
-#include <velocypack/Iterator.h>
-#include <velocypack/Utf8Helper.h>
-
 #include "Index.h"
 
 #include "Aql/Projections.h"
 #include "Aql/Ast.h"
-#include "Aql/AstNode.h"
 #include "Aql/Variable.h"
 #include "Basics/Exceptions.h"
 #include "Basics/StaticStrings.h"
-#include "Basics/StringUtils.h"
 #include "Basics/VelocyPackHelper.h"
 #include "Basics/datetime.h"
 #include "Containers/HashSet.h"
@@ -46,6 +37,13 @@
 #include "Utilities/NameValidator.h"
 #include "VocBase/LogicalCollection.h"
 #include "VocBase/ticks.h"
+
+#include <date/date.h>
+#include <velocypack/Iterator.h>
+#include <velocypack/Utf8Helper.h>
+
+#include <iostream>
+#include <limits>
 
 using namespace std::chrono;
 using namespace date;
@@ -235,10 +233,92 @@ Index::Index(IndexId iid, arangodb::LogicalCollection& collection,
 
 Index::~Index() = default;
 
+/// @brief return the index name
+std::string const& Index::name() const {
+  if (_name == StaticStrings::IndexNameEdgeFrom ||
+      _name == StaticStrings::IndexNameEdgeTo) {
+    return StaticStrings::IndexNameEdge;
+  }
+  return _name;
+}
+
 void Index::name(std::string const& newName) {
   if (_name.empty()) {
     _name = newName;
   }
+}
+
+/// @brief return the index fields names
+std::vector<std::vector<std::string>> Index::fieldNames() const {
+  std::vector<std::vector<std::string>> result;
+  result.reserve(_fields.size());
+
+  for (auto const& it : _fields) {
+    std::vector<std::string> parts;
+    parts.reserve(it.size());
+    for (auto const& it2 : it) {
+      parts.emplace_back(it2.name);
+    }
+    result.emplace_back(std::move(parts));
+  }
+  return result;
+}
+
+/// @brief whether or not the ith attribute is expanded (somewhere)
+bool Index::isAttributeExpanded(size_t i) const {
+  if (i >= _fields.size()) {
+    return false;
+  }
+  return TRI_AttributeNamesHaveExpansion(_fields[i]);
+}
+
+/// @brief whether or not any attribute is expanded
+bool Index::isAttributeExpanded(
+    std::vector<basics::AttributeName> const& attribute) const {
+  for (auto const& it : _fields) {
+    if (!basics::AttributeName::namesMatch(attribute, it)) {
+      continue;
+    }
+    return TRI_AttributeNamesHaveExpansion(it);
+  }
+  return false;
+}
+
+/// @brief whether or not any attribute is expanded
+bool Index::attributeMatches(
+    std::vector<basics::AttributeName> const& attribute, bool isPrimary) const {
+  for (auto const& it : _fields) {
+    if (basics::AttributeName::isIdentical(attribute, it, true)) {
+      return true;
+    }
+  }
+  if (isPrimary) {
+    static std::vector<basics::AttributeName> const vec_id{
+        {StaticStrings::IdString, false}};
+    return basics::AttributeName::isIdentical(attribute, vec_id, true);
+  }
+  return false;
+}
+
+/// @brief whether or not the given attribute vector matches any of the index
+/// fields In case it does, the position will be returned as well.
+std::pair<bool, size_t> Index::attributeMatchesWithPos(
+    std::vector<basics::AttributeName> const& attribute, bool isPrimary) const {
+  size_t pos = 0;
+  for (auto const& it : _fields) {
+    if (basics::AttributeName::isIdentical(attribute, it, true)) {
+      return {true, pos};
+    }
+    pos++;
+  }
+  if (isPrimary) {
+    static std::vector<basics::AttributeName> const vec_id{
+        {StaticStrings::IdString, false}};
+    return basics::AttributeName::isIdentical(attribute, vec_id, true)
+               ? std::pair<bool, size_t>(true, pos)
+               : std::pair<bool, size_t>(false, -1);
+  }
+  return {false, -1};
 }
 
 size_t Index::sortWeight(arangodb::aql::AstNode const* node) {
@@ -362,6 +442,9 @@ Index::IndexType Index::type(std::string_view type) {
   if (type == arangodb::iresearch::IRESEARCH_INVERTED_INDEX_TYPE) {
     return TRI_IDX_TYPE_INVERTED_INDEX;
   }
+  if (type == "vector") {
+    return TRI_IDX_TYPE_VECTOR_INDEX;
+  }
   return TRI_IDX_TYPE_UNKNOWN;
 }
 
@@ -406,6 +489,8 @@ char const* Index::oldtypeName(Index::IndexType type) {
       return "mdi-prefixed";
     case TRI_IDX_TYPE_INVERTED_INDEX:
       return arangodb::iresearch::IRESEARCH_INVERTED_INDEX_TYPE.data();
+    case TRI_IDX_TYPE_VECTOR_INDEX:
+      return "vector";
     case TRI_IDX_TYPE_UNKNOWN: {
     }
   }
@@ -463,7 +548,7 @@ bool Index::validateHandleName(bool extendedNames,
 IndexId Index::generateId() { return IndexId{TRI_NewTickServer()}; }
 
 /// @brief check if two index definitions share any identifiers (_id, name)
-bool Index::CompareIdentifiers(velocypack::Slice const& lhs,
+bool Index::compareIdentifiers(velocypack::Slice const& lhs,
                                velocypack::Slice const& rhs) {
   VPackSlice lhsId = lhs.get(arangodb::StaticStrings::IndexId);
   VPackSlice rhsId = rhs.get(arangodb::StaticStrings::IndexId);
@@ -484,7 +569,7 @@ bool Index::CompareIdentifiers(velocypack::Slice const& lhs,
 
 /// @brief index comparator, used by the coordinator to detect if two index
 /// contents are the same
-bool Index::Compare(StorageEngine& engine, VPackSlice const& lhs,
+bool Index::compare(StorageEngine& engine, VPackSlice const& lhs,
                     VPackSlice const& rhs, std::string const& dbname) {
   auto normalizeType = [](VPackSlice s) -> std::string_view {
     TRI_ASSERT(s.isString());
@@ -656,6 +741,10 @@ double Index::selectivityEstimate(std::string_view) const {
     return 1.0;
   }
   THROW_ARANGO_EXCEPTION(TRI_ERROR_NOT_IMPLEMENTED);
+}
+
+void Index::updateClusterSelectivityEstimate(double /*estimate*/) {
+  TRI_ASSERT(false);  // should never be called except on Coordinator
 }
 
 /// @brief whether or not the index is implicitly unique
@@ -932,6 +1021,13 @@ bool Index::covers(aql::Projections& projections) const {
 
 bool Index::canWarmup() const noexcept { return false; }
 
+UserVectorIndexDefinition const& Index::getVectorIndexDefinition() {
+  TRI_ASSERT(false);
+  THROW_ARANGO_EXCEPTION_MESSAGE(
+      TRI_ERROR_NOT_IMPLEMENTED,
+      "Requesting vector index definition on a non-vector index");
+}
+
 Result Index::warmup() {
   // we should never be called in the base class.
   TRI_ASSERT(!canWarmup());
@@ -939,6 +1035,18 @@ Result Index::warmup() {
   // Do nothing. If an index needs some warmup
   // it has to explicitly implement it.
   return {};
+}
+
+/// @brief generate error result
+/// @param code the error key
+/// @param key the conflicting key
+Result& Index::addErrorMsg(Result& r, ErrorCode code,
+                           std::string_view key) const {
+  if (code != TRI_ERROR_NO_ERROR) {
+    r.reset(code);
+    return addErrorMsg(r, key);
+  }
+  return r;
 }
 
 /// @brief generate error message
@@ -1026,7 +1134,7 @@ AttributeAccessParts::AttributeAccessParts(aql::AstNode const* comparison,
     // got value == a.b  ->  flip the two sides
     attribute = comparison->getMember(1);
     value = comparison->getMember(0);
-    opType = aql::Ast::ReverseOperator(opType);
+    opType = aql::Ast::reverseOperator(opType);
   }
 
   TRI_ASSERT(attribute->type == aql::NODE_TYPE_ATTRIBUTE_ACCESS);
@@ -1115,6 +1223,21 @@ std::unique_ptr<AqlIndexStreamIterator> Index::streamForCondition(
       TRI_ERROR_INTERNAL,
       std::string(
           "no default implementation for streamForCondition. index type: ") +
+          typeName());
+}
+
+bool Index::supportsDistinctScan(
+    IndexDistinctScanOptions const&) const noexcept {
+  return false;
+}
+
+std::unique_ptr<AqlIndexDistinctScanIterator> Index::distinctScanFor(
+    transaction::Methods* trx, IndexDistinctScanOptions const&) {
+  TRI_ASSERT(false);
+  THROW_ARANGO_EXCEPTION_MESSAGE(
+      TRI_ERROR_INTERNAL,
+      std::string(
+          "no default implementation for distinctScanFor. index-type = ") +
           typeName());
 }
 

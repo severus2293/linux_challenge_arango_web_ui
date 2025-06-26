@@ -26,15 +26,15 @@
 
 #include "Aql/Ast.h"
 #include "Aql/AstNode.h"
-#include "Aql/ExecutionNode.h"
+#include "Aql/ExecutionNode/ExecutionNode.h"
+#include "Aql/ExecutionNode/IResearchViewNode.h"
 #include "Aql/Expression.h"
 #include "Aql/Function.h"
-#include "Aql/IResearchViewNode.h"
 #include "Aql/SortCondition.h"
 #include "Aql/types.h"
 #include "Basics/Exceptions.h"
-#include "Basics/fasthash.h"
 #include "IResearch/IResearchFeature.h"
+#include "IResearch/IResearchFilterContext.h"
 #include "IResearch/VelocyPackHelper.h"
 
 #include <search/scorers.hpp>

@@ -1,4 +1,4 @@
-/* global fs, PWD, writeGraphData, getShardCount, getReplicationFactor,  print, progress, db, createSafe, _, semver */
+/* global fs, PWD, writeGraphData, getShardCount, getReplicationFactor,  print, progress, db, createSafe, _, semver,  createUseDatabaseSafe*/
 
 (function () {
   let egm;
@@ -9,56 +9,47 @@
     isSupported: function (currentVersion, oldVersion, options, enterprise, cluster) {
       // strip off -nightly etc:
       let ver = semver.parse(oldVersion.split('-')[0]);
-      return enterprise && (semver.gte(ver, "3.10.0"));
+      return enterprise && semver.gte(ver, "3.10.0") && (!options.singleShard || semver.lte(ver, "3.11.999") || semver.gte(ver, "3.12.1"));
     },
     makeDataDB: function (options, isCluster, isEnterprise, database, dbCount) {
       egm = require('@arangodb/enterprise-graph');
       // All items created must contain dbCount
-      print(`570: making per database data ${dbCount}`);
+      print(`${Date()} 570: making per database data ${dbCount}`);
       let baseName = database;
       if (baseName === "_system") {
         baseName = "system";
       }
       const databaseName = `${baseName}_${dbCount}_entGraph`;
-      const created = createSafe(databaseName,
-                                 dbname => {
-                                   db._flushCache();
-                                   db._createDatabase(dbname);
-                                   db._useDatabase(dbname);
-                                   return true;
-                                 }, dbname => {
-                                   throw new Error("Creation of database ${databaseName} failed!");
-                                 }
-                                );
+      const created = createUseDatabaseSafe(databaseName, {});
       progress(`created database '${databaseName}'`);
       createSafe(`G_enterprise_${dbCount}`, graphName => {
         return egm._create(graphName,
-                           [
-                             {
-                                 "collection": `citations_enterprise_${dbCount}`,
-                                 "to": [`patents_enterprise_${dbCount}`],
-                                 "from": [`patents_enterprise_${dbCount}`]
-                              }
-                           ],
-                           [],
-                           {
-                             numberOfShards: getShardCount(3),
-                             replicationFactor: getReplicationFactor(2),
-                             isSmart: true
-                           });
+          [
+            {
+              "collection": `citations_enterprise_${dbCount}`,
+              "to": [`patents_enterprise_${dbCount}`],
+              "from": [`patents_enterprise_${dbCount}`]
+            }
+          ],
+          [],
+          {
+            numberOfShards: getShardCount(3),
+            replicationFactor: getReplicationFactor(2),
+            isSmart: true
+          });
       }, graphName => {
         return egm._graph(graphName);
       });
       progress('createEGraph2');
       writeGraphData(db._collection(`patents_enterprise_${dbCount}`),
-                     db._collection(`citations_enterprise_${dbCount}`),
-                     _.clone(vertices),
-                     _.clone(smartEdges));
+        db._collection(`citations_enterprise_${dbCount}`),
+        _.clone(vertices),
+        _.clone(smartEdges));
       progress('writeEGraph2');
       return 0;
     },
     checkDataDB: function (options, isCluster, isEnterprise, database, dbCount, readOnly) {
-      print(`570: checking data in database ${database} dbCount: ${dbCount}`);
+      print(`${Date()} 570: checking data in database ${database} dbCount: ${dbCount}`);
       let baseName = database;
       if (baseName === "_system") {
         baseName = "system";
@@ -86,7 +77,7 @@
         throw new Error(`570: ${eColName} Citations smart count incomplete: want ${expectNoEdges} have: ${citationsSmart.count()}`);
       }
       let docIds = ['US:38582450', 'IL:60095520', 'US:60095410', 'US:49997870'];
-      if (options.dataMultiplier !== 1 || options.numberOfDBs !== 1 ) {
+      if (options.dataMultiplier !== 1 || options.numberOfDBs !== 1) {
         [0, 1, 2, 3].forEach(i => {
           let doc = {};
           do {
@@ -150,7 +141,7 @@
       return 0;
     },
     clearDataDB: function (options, isCluster, isEnterprise, database, dbCount) {
-      print(`570: Clearing data. Database: ${database}. DBCount: ${dbCount}`);
+      print(`${Date()} 570: Clearing data. Database: ${database}. DBCount: ${dbCount}`);
       let baseName = database;
       if (baseName === "_system") {
         baseName = "system";

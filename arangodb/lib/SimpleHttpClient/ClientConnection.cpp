@@ -24,7 +24,6 @@
 #include <errno.h>
 #include <string>
 
-#include "Basics/Common.h"
 #include "Basics/operating-system.h"
 
 #ifdef TRI_HAVE_WINSOCK2_H
@@ -123,12 +122,7 @@ bool ClientConnection::writeClientConnection(void const* buffer, size_t length,
     return false;
   }
 
-#if defined(__APPLE__)
-  // MSG_NOSIGNAL not supported on apple platform
-  long status = TRI_send(_socket, buffer, length, 0);
-#else
   long status = TRI_send(_socket, buffer, length, MSG_NOSIGNAL);
-#endif
 
   if (status < 0) {
     TRI_set_errno(TRI_ERROR_SYS_ERROR);
@@ -203,4 +197,12 @@ bool ClientConnection::readable() {
   }
 
   return false;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+/// @brief return whether the connection is still OK
+//////////////////////////////////////////////////////////////////////////////
+
+bool ClientConnection::test_idle_connection() {
+  return TRI_socket_test_idle_connection(_socket);
 }

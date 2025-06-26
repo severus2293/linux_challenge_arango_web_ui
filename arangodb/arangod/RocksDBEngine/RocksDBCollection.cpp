@@ -41,9 +41,6 @@
 #include "Cache/TransactionalCache.h"
 #include "Cluster/ClusterMethods.h"
 #include "Replication2/Version.h"
-#ifndef ARANGODB_ENABLE_MAINTAINER_MODE
-#include "CrashHandler/CrashHandler.h"
-#endif
 #include "IResearch/IResearchRocksDBInvertedIndex.h"
 #include "Indexes/Index.h"
 #include "Indexes/IndexIterator.h"
@@ -324,16 +321,18 @@ RocksDBCollection::RocksDBCollection(LogicalCollection& collection,
                         .server()
                         .getFeature<CacheManagerFeature>()
                         .manager()),
-      _cacheEnabled(_cacheManager != nullptr && !collection.system() &&
-                    !collection.isAStub() &&
-                    !ServerState::instance()->isCoordinator() &&
-                    basics::VelocyPackHelper::getBooleanValue(
-                        info, StaticStrings::CacheEnabled, false)),
+      _maxCacheValueSize(
+          _cacheManager == nullptr ? 0 : _cacheManager->maxCacheValueSize()),
       _statistics(collection.vocbase()
                       .server()
                       .getFeature<metrics::MetricsFeature>()
                       .serverStatistics()
-                      ._transactionsStatistics) {
+                      ._transactionsStatistics),
+      _cacheEnabled(_cacheManager != nullptr && !collection.system() &&
+                    !collection.isAStub() &&
+                    !ServerState::instance()->isCoordinator() &&
+                    basics::VelocyPackHelper::getBooleanValue(
+                        info, StaticStrings::CacheEnabled, false)) {
   TRI_ASSERT(_logicalCollection.isAStub() || objectId() != 0);
   if (_cacheEnabled.load(std::memory_order_relaxed)) {
     setupCache();
@@ -586,6 +585,9 @@ futures::Future<std::shared_ptr<Index>> RocksDBCollection::createIndex(
 
     // release inventory lock while we are filling the index
     inventoryLocker.unlock();
+
+    // prepare index for insertion, e.g. vector index needs to be trained
+    buildIdx->beforeCreate();
 
     // Step 4. fill index
     bool const inBackground = basics::VelocyPackHelper::getBooleanValue(
@@ -887,7 +889,7 @@ Result RocksDBCollection::truncateWithRemovals(transaction::Methods& trx,
       RocksDBColumnFamilyManager::get(
           RocksDBColumnFamilyManager::Family::Documents)
           ->GetComparator();
-  rocksdb::Slice const end = documentBounds.end();
+  rocksdb::Slice end = documentBounds.end();
 
   // avoid OOM error for truncate by committing earlier
   auto state = RocksDBTransactionState::toState(&trx);
@@ -946,15 +948,17 @@ Result RocksDBCollection::truncateWithRemovals(transaction::Methods& trx,
     return r.result;
   };
 
+  constexpr bool readOwnWrites = false;
   auto iter =
       mthds->NewIterator(documentBounds.columnFamily(), [&](ReadOptions& ro) {
-        if (!mthds->iteratorMustCheckBounds(ReadOwnWrites::no)) {
+        if (!mthds->iteratorMustCheckBounds(
+                readOwnWrites ? ReadOwnWrites::yes : ReadOwnWrites::no)) {
           ro.iterate_upper_bound = &end;
         }
         // we are going to blow away all data anyway. no need to blow up the
         // cache
         ro.fill_cache = false;
-        ro.readOwnWrites = false;
+        ro.readOwnWrites = readOwnWrites;
         TRI_ASSERT(ro.snapshot);
       });
   for (iter->Seek(documentBounds.start());
@@ -970,16 +974,15 @@ Result RocksDBCollection::truncateWithRemovals(transaction::Methods& trx,
 
     ++found;
     if (found == 1000) {
-      Result res = removeBufferedDocuments(keyBuffer, found);
-      if (res.fail()) {
+      if (Result res = removeBufferedDocuments(keyBuffer, found); res.fail()) {
         return res;
       }
+      TRI_ASSERT(found == 0);
     }
   }
 
   if (found > 0) {
-    Result res = removeBufferedDocuments(keyBuffer, found);
-    if (res.fail()) {
+    if (Result res = removeBufferedDocuments(keyBuffer, found); res.fail()) {
       return res;
     }
   }
@@ -1209,14 +1212,8 @@ Result RocksDBCollection::insert(transaction::Methods& trx,
   RocksDBSavePoint savepoint(_logicalCollection.id(), *state,
                              TRI_VOC_DOCUMENT_OPERATION_INSERT);
 
-  Result res = insertDocument(&trx, indexesSnapshot, savepoint, newDocumentId,
-                              newDocument, options, newRevisionId);
-
-  if (res.ok()) {
-    res = savepoint.finish(newRevisionId);
-  }
-
-  return res;
+  return insertDocument(&trx, indexesSnapshot, savepoint, newDocumentId,
+                        newDocument, options, newRevisionId);
 }
 
 Result RocksDBCollection::update(
@@ -1274,15 +1271,9 @@ Result RocksDBCollection::performUpdateOrReplace(
 
   RocksDBSavePoint savepoint(_logicalCollection.id(), *state, opType);
 
-  Result res = modifyDocument(
-      &trx, indexesSnapshot, savepoint, previousDocumentId, previousDocument,
-      newDocumentId, newDocument, previousRevisionId, newRevisionId, options);
-
-  if (res.ok()) {
-    res = savepoint.finish(newRevisionId);
-  }
-
-  return res;
+  return modifyDocument(&trx, indexesSnapshot, savepoint, previousDocumentId,
+                        previousDocument, newDocumentId, newDocument,
+                        previousRevisionId, newRevisionId, options);
 }
 
 Result RocksDBCollection::remove(transaction::Methods& trx,
@@ -1303,15 +1294,8 @@ Result RocksDBCollection::remove(transaction::Methods& trx,
   RocksDBSavePoint savepoint(_logicalCollection.id(), *state,
                              TRI_VOC_DOCUMENT_OPERATION_REMOVE);
 
-  Result res =
-      removeDocument(&trx, indexesSnapshot, savepoint, previousDocumentId,
-                     previousDocument, options, previousRevisionId);
-
-  if (res.ok()) {
-    res = savepoint.finish(_logicalCollection.newRevisionId());
-  }
-
-  return res;
+  return removeDocument(&trx, indexesSnapshot, savepoint, previousDocumentId,
+                        previousDocument, options, previousRevisionId);
 }
 
 bool RocksDBCollection::cacheEnabled() const noexcept {
@@ -1451,6 +1435,11 @@ void RocksDBCollection::figuresSpecific(
                 db, RocksDBKeyBounds::FulltextIndex(rix->objectId()), snapshot,
                 true);
             break;
+          case Index::TRI_IDX_TYPE_VECTOR_INDEX:
+            count = rocksutils::countKeyRange(
+                db, RocksDBKeyBounds::VectorVPackIndex(rix->objectId()),
+                snapshot, true);
+            break;
           default:
             // we should not get here
             TRI_ASSERT(false);
@@ -1522,10 +1511,8 @@ Result RocksDBCollection::insertDocument(transaction::Methods* trx,
   key->constructDocument(objectId(), documentId);
   TRI_ASSERT(key->containsLocalDocumentId(documentId));
 
-  if (state->hasHint(transaction::Hints::Hint::GLOBAL_MANAGED)) {
-    // banish new document to avoid caching without committing first
-    invalidateCacheEntry(key.ref());
-  }
+  // banish new document to avoid caching without committing first
+  invalidateCacheEntry(key.ref());
 
   // disable indexing in this transaction if we are allowed to
   IndexingDisabler disabler(mthds, state->isSingleOperation());
@@ -1640,7 +1627,11 @@ Result RocksDBCollection::insertDocument(transaction::Methods* trx,
 
   if (res.ok()) {
     TRI_ASSERT(revisionId == RevisionId::fromSlice(doc));
-    state->trackInsert(_logicalCollection.id(), revisionId);
+
+    res = savepoint.finish(revisionId);
+    if (res.ok()) {
+      state->trackInsert(_logicalCollection.id(), revisionId);
+    }
   }
 
   return res;
@@ -1758,9 +1749,13 @@ Result RocksDBCollection::removeDocument(transaction::Methods* trx,
   }
 
   if (res.ok()) {
-    RocksDBTransactionState* state = RocksDBTransactionState::toState(trx);
     TRI_ASSERT(revisionId == RevisionId::fromSlice(doc));
-    state->trackRemove(_logicalCollection.id(), revisionId);
+
+    res = savepoint.finish(_logicalCollection.newRevisionId());
+    if (res.ok()) {
+      RocksDBTransactionState* state = RocksDBTransactionState::toState(trx);
+      state->trackRemove(_logicalCollection.id(), revisionId);
+    }
   }
 
   return res;
@@ -1786,10 +1781,6 @@ Result RocksDBCollection::modifyDocument(
       err.appendErrorMessage("; new key: ");
       err.appendErrorMessage(newDoc.get(StaticStrings::KeyString).stringView());
     });
-#ifndef ARANGODB_ENABLE_MAINTAINER_MODE
-    LOG_TOPIC("b28a9", ERR, Logger::ENGINES) << res.errorMessage();
-    CrashHandler::logBacktrace();
-#endif
     TRI_ASSERT(false) << res.errorMessage();
     return res;
   }
@@ -1930,10 +1921,8 @@ Result RocksDBCollection::modifyDocument(
     return res.reset(rocksutils::convertStatus(s, rocksutils::document));
   }
 
-  if (state->hasHint(transaction::Hints::Hint::GLOBAL_MANAGED)) {
-    // banish new document to avoid caching without committing first
-    invalidateCacheEntry(key.ref());
-  }
+  // banish new document to avoid caching without committing first
+  invalidateCacheEntry(key.ref());
 
   trx->state()->trackShardUsage(
       *trx->resolver(), _logicalCollection.vocbase().name(),
@@ -1987,8 +1976,12 @@ Result RocksDBCollection::modifyDocument(
 
   if (res.ok()) {
     TRI_ASSERT(newRevisionId == RevisionId::fromSlice(newDoc));
-    state->trackRemove(_logicalCollection.id(), oldRevisionId);
-    state->trackInsert(_logicalCollection.id(), newRevisionId);
+
+    res = savepoint.finish(newRevisionId);
+    if (res.ok()) {
+      state->trackRemove(_logicalCollection.id(), oldRevisionId);
+      state->trackInsert(_logicalCollection.id(), newRevisionId);
+    }
   }
 
   return res;
@@ -2050,7 +2043,8 @@ Result RocksDBCollection::lookupDocumentVPack(
   }
 
   TRI_ASSERT(ps.size() > 0);
-  if (options.fillCache && cache != nullptr) {
+  if (options.fillCache && cache != nullptr &&
+      ps.size() <= _maxCacheValueSize) {
     // write entry back to cache
     cache::Cache::SimpleInserter<DocumentCacheType>{
         static_cast<DocumentCacheType&>(*cache), key->string().data(),
@@ -2089,6 +2083,8 @@ void RocksDBCollection::setupCache() const {
   auto cache = _cache;
   if (cache == nullptr) {
     TRI_ASSERT(_cacheManager != nullptr);
+    TRI_ASSERT(_cacheManager->options().cacheSize > 0);
+    TRI_ASSERT(_cacheManager->options().maxCacheValueSize > 0);
     LOG_TOPIC("f5df2", DEBUG, Logger::CACHE) << "Creating document cache";
     cache = _cacheManager->createCache<cache::BinaryKeyHasher>(
         cache::CacheType::Transactional);

@@ -23,15 +23,14 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "RocksDBValue.h"
+#include <velocypack/Slice.h>
 
 #include "ApplicationFeatures/ApplicationServer.h"
 #include "Basics/Exceptions.h"
-#include "Basics/NumberUtils.h"
 #include "Basics/StaticStrings.h"
 #include "Basics/StringUtils.h"
 #include "Replication2/ReplicatedLog/LogEntry.h"
 #include "RocksDBEngine/RocksDBFormat.h"
-
 #include "Transaction/Helpers.h"
 
 using namespace arangodb;
@@ -99,6 +98,11 @@ RocksDBValue RocksDBValue::UniqueVPackIndexValue(LocalDocumentId docId) {
 RocksDBValue RocksDBValue::UniqueVPackIndexValue(LocalDocumentId docId,
                                                  VPackSlice data) {
   return RocksDBValue(RocksDBEntryType::UniqueVPackIndexValue, docId, data);
+}
+
+RocksDBValue RocksDBValue::VectorIndexValue(const char* codeData,
+                                            std::size_t codeSize) {
+  return RocksDBValue(codeData, codeSize);
 }
 
 RocksDBValue RocksDBValue::View(VPackSlice data) {
@@ -314,6 +318,14 @@ RocksDBValue::RocksDBValue(S2Point const& p)
   uint64ToPersistent(_buffer, ::doubleToInt(p.x()));
   uint64ToPersistent(_buffer, ::doubleToInt(p.y()));
   uint64ToPersistent(_buffer, ::doubleToInt(p.z()));
+}
+
+RocksDBValue::RocksDBValue(char const* codeData, std::size_t codeSize)
+    : _type(RocksDBEntryType::VectorVPackIndexValue), _buffer() {
+  TRI_ASSERT(codeData != nullptr);
+  TRI_ASSERT(codeSize >= 0);
+  _buffer.reserve(sizeof(char) * codeSize);
+  _buffer.append(codeData, codeSize);
 }
 
 LocalDocumentId RocksDBValue::documentId(char const* data, uint64_t size) {

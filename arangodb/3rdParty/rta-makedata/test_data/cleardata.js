@@ -49,6 +49,12 @@ let {
 } = require(fs.join(PWD, 'common'));
 
 const {
+  assertTrue,
+  assertFalse,
+  assertEqual
+} = require("jsunity").jsUnity.assertions;
+
+const {
   createAnalyzerSet,
   checkAnalyzerSet,
   deleteAnalyzerSet
@@ -70,7 +76,8 @@ const optionsDefaults = {
   passvoid: '',
   printTimeMeasurement: false,
   bigDoc: false,
-  test: undefined
+  test: undefined,
+  forceOneShard: false
 };
 
 let args = _.clone(ARGUMENTS);
@@ -83,6 +90,9 @@ if ((args.length > 0) &&
 let opts = internal.parseArgv(args, 0);
 _.defaults(opts, optionsDefaults);
 setOptions(opts);
+if (opts.collectionCountOffset !== 0 && database === '_system') {
+  throw new Error("must not specify count without different database.");
+}
 
 var numberLength = Math.log(opts.numberOfDBs + opts.countOffset) * Math.LOG10E + 1 | 0;
 
@@ -126,14 +136,16 @@ function getReplicationFactor (defaultReplicationFactor) {
   return defaultReplicationFactor;
 }
 
-const fns = scanMakeDataPaths(opts, PWD, dbVersion, opts.oldVersion, wantFunctions, 'clearData', false);
-mainTestLoop(opts, isCluster, enterprise, fns, function(database) {
+let fns = scanMakeDataPaths(opts, PWD, dbVersion, opts.oldVersion, wantFunctions, 'clearData', false);
+fns[0] = fns[0].reverse();
+fns[1] = fns[1].reverse();
+mainTestLoop(opts, database, isCluster, enterprise, fns, function(database) {
   // Drop database:
   if (database !== "_system") {
     print('#ix');
     db._useDatabase("_system");
     
-    if (database !== "_system") {
+    if ((database !== "_system") && db._databases().includes(databaseName) ) {
       db._dropDatabase(databaseName);
     }
     progress("mainTestLoop");

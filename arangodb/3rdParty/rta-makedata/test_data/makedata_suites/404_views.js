@@ -24,7 +24,7 @@
       extended_scorers.push('BM25(@doc, 1, 1) DESC');
 
       for (const s of extended_scorers) {
-        print(`404: ${s}`);
+        print(`${Date()} 404: ${s}`);
         let score = s.replace('@doc', 'd');
         let res1 = db._query(`FOR d IN ${viewName} SEARCH d.a == 'a' OPTIONS {waitForSync:true} SORT ${score} LIMIT 10 RETURN d`).toArray();
         assertEqual(res1.length, 10);
@@ -41,14 +41,14 @@
       },
       makeDataDB: function (options, isCluster, isEnterprise, database, dbCount) {
         // All items created must contain dbCount and dbCount
-        print(`404: making data ${dbCount}`);
+        print(`${Date()} 404: making data ${dbCount}`);
         let asViewWandName = `as_view_wand_${dbCount}`;
         let saViewWandName = `sa_view_wand_${dbCount}`;
         let collectionName0 = `collection_wand_0${dbCount}`;
         let collectionName1 = `collection_wand_1${dbCount}`;
 
-        let c0 = db._create(collectionName0, {"numberOfShards": 3, "replicationFactor": 2, "writeConcern": 1});
-        let c1 = db._create(collectionName1, {"numberOfShards": 3, "replicationFactor": 2, "writeConcern": 1});
+        let c0 = createCollectionSafe(collectionName0, 3, 2, {"writeConcern": 1});
+        let c1 = createCollectionSafe(collectionName1, 3, 2, {"writeConcern": 1});
 
         let meta0 = {
           'links': { },
@@ -94,7 +94,7 @@
         }
       },
     checkDataDB: function (options, isCluster, isEnterprise, database, dbCount, readOnly) {
-        print(`404: checking data ${dbCount} ${dbCount}`);
+        print(`${Date()} 404: checking data ${dbCount} ${dbCount}`);
         let asViewWandName = `as_view_wand_${dbCount}`;
         let saViewWandName = `sa_view_wand_${dbCount}`;
         let collectionName0 = `collection_wand_0${dbCount}`;
@@ -151,7 +151,7 @@
         }
       },
     clearDataDB: function (options, isCluster, isEnterprise, database, dbCount) {
-        print(`404: removing data ${dbCount}`);
+        print(`${Date()} 404: removing data ${dbCount}`);
         let asViewWandName = `as_view_wand_${dbCount}`;
         let saViewWandName = `sa_view_wand_${dbCount}`;
         let collectionName0 = `collection_wand_0${dbCount}`;

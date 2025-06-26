@@ -328,6 +328,7 @@ RocksDBOptionFeature::RocksDBOptionFeature(Server& server)
       _partitionFilesForEdgeIndexCf(false),
       _partitionFilesForVPackIndexCf(false),
       _partitionFilesForMdiIndexCf(false),
+      _partitionFilesForVectorIndexCf(false),
       _maxWriteBufferNumberCf{0, 0, 0, 0, 0, 0, 0, 0, 0, 0} {
   // setting the number of background jobs to
   _maxBackgroundJobs = static_cast<int32_t>(
@@ -659,22 +660,16 @@ number of cross-page I/O operations.)");
           arangodb::options::Flags::OnDBServer,
           arangodb::options::Flags::OnSingle));
 
-#ifdef __linux__
   options->addOption(
       "--rocksdb.use-direct-reads", "Use O_DIRECT for reading files.",
       new BooleanParameter(&_useDirectReads),
-      arangodb::options::makeFlags(arangodb::options::Flags::DefaultNoOs,
-                                   arangodb::options::Flags::OsLinux,
-                                   arangodb::options::Flags::Uncommon));
+      arangodb::options::makeFlags(arangodb::options::Flags::Uncommon));
 
   options->addOption(
       "--rocksdb.use-direct-io-for-flush-and-compaction",
       "Use O_DIRECT for writing files for flush and compaction.",
       new BooleanParameter(&_useDirectIoForFlushAndCompaction),
-      arangodb::options::makeFlags(arangodb::options::Flags::DefaultNoOs,
-                                   arangodb::options::Flags::OsLinux,
-                                   arangodb::options::Flags::Uncommon));
-#endif
+      arangodb::options::makeFlags(arangodb::options::Flags::Uncommon));
 
   options->addOption(
       "--rocksdb.use-fsync",
@@ -1299,7 +1294,6 @@ version.)");
           new BooleanParameter(&_useJemallocAllocator),
           arangodb::options::makeFlags(arangodb::options::Flags::Experimental,
                                        arangodb::options::Flags::Uncommon,
-                                       arangodb::options::Flags::OsLinux,
                                        arangodb::options::Flags::OnAgent,
                                        arangodb::options::Flags::OnDBServer,
                                        arangodb::options::Flags::OnSingle))
@@ -1534,13 +1528,43 @@ limited number of edge collections/shards/indexes.)");
   limited number of edge collections/shards/indexes.)");
 
   options
+      ->addOption("--rocksdb.partition-files-for-vector-index",
+                  "If enabled, the index data for different vector "
+                  "indexes will end up in different .sst files.",
+                  new BooleanParameter(&_partitionFilesForVectorIndexCf),
+                  arangodb::options::makeFlags(
+                      arangodb::options::Flags::Uncommon,
+                      arangodb::options::Flags::Experimental,
+                      arangodb::options::Flags::DefaultNoComponents,
+                      arangodb::options::Flags::OnDBServer,
+                      arangodb::options::Flags::OnSingle))
+      .setIntroducedIn(31204)
+      .setLongDescription(R"(Enabling this option makes RocksDB's
+compaction write the index data for different vector
+indexes (also indexes from different collections/shards) into different
+.sst files. Otherwise, the index data from different
+collections/shards/indexes can be mixed and written into the same .sst files.
+
+Enabling this option usually has the benefit of making the RocksDB
+compaction more efficient when a lot of different collections/shards/indexes
+are written to in parallel.
+The disadvantage of enabling this option is that there can be more .sst
+files than when the option is disabled, and the disk space used by
+these .sst files can be higher than if there are fewer .sst files
+because there is some overhead per .sst file.
+For deployments with many collections/shards/indexes in particular,
+this can lead to a very high number of .sst files, with the potential
+of outgrowing the maximum number of file descriptors the ArangoDB process
+can open. The option should thus only be enabled for deployments with a
+limited number of edge collections/shards/indexes.)");
+
+  options
       ->addOption(
           "--rocksdb.use-io_uring",
           "Check for existence of io_uring at startup and use it if available. "
           "Should be set to false only to opt out of using io_uring.",
           new BooleanParameter(&ioUringEnabled),
           arangodb::options::makeFlags(arangodb::options::Flags::Uncommon,
-                                       arangodb::options::Flags::OsLinux,
                                        arangodb::options::Flags::OnAgent,
                                        arangodb::options::Flags::OnDBServer,
                                        arangodb::options::Flags::OnSingle))
@@ -1549,17 +1573,18 @@ limited number of edge collections/shards/indexes.)");
   //////////////////////////////////////////////////////////////////////////////
   /// add column family-specific options now
   //////////////////////////////////////////////////////////////////////////////
-  std::initializer_list<RocksDBColumnFamilyManager::Family> families = {
-      RocksDBColumnFamilyManager::Family::Definitions,
-      RocksDBColumnFamilyManager::Family::Documents,
-      RocksDBColumnFamilyManager::Family::PrimaryIndex,
-      RocksDBColumnFamilyManager::Family::EdgeIndex,
-      RocksDBColumnFamilyManager::Family::VPackIndex,
-      RocksDBColumnFamilyManager::Family::GeoIndex,
-      RocksDBColumnFamilyManager::Family::FulltextIndex,
-      RocksDBColumnFamilyManager::Family::ReplicatedLogs,
-      RocksDBColumnFamilyManager::Family::MdiIndex,
-      RocksDBColumnFamilyManager::Family::MdiVPackIndex};
+  static constexpr std::initializer_list<RocksDBColumnFamilyManager::Family>
+      families{RocksDBColumnFamilyManager::Family::Definitions,
+               RocksDBColumnFamilyManager::Family::Documents,
+               RocksDBColumnFamilyManager::Family::PrimaryIndex,
+               RocksDBColumnFamilyManager::Family::EdgeIndex,
+               RocksDBColumnFamilyManager::Family::VPackIndex,
+               RocksDBColumnFamilyManager::Family::GeoIndex,
+               RocksDBColumnFamilyManager::Family::FulltextIndex,
+               RocksDBColumnFamilyManager::Family::ReplicatedLogs,
+               RocksDBColumnFamilyManager::Family::MdiIndex,
+               RocksDBColumnFamilyManager::Family::MdiVPackIndex,
+               RocksDBColumnFamilyManager::Family::VectorIndex};
 
   auto addMaxWriteBufferNumberCf =
       [this, &options](RocksDBColumnFamilyManager::Family family) {
@@ -1573,6 +1598,10 @@ limited number of edge collections/shards/indexes.)");
             family == RocksDBColumnFamilyManager::Family::MdiIndex) {
           introducedIn = 31200;
         }
+        if (family == RocksDBColumnFamilyManager::Family::VectorIndex) {
+          introducedIn = 31204;
+        }
+
         options
             ->addOption("--rocksdb.max-write-buffer-number-" + name,
                         "If non-zero, overrides the value of "
@@ -2173,6 +2202,13 @@ rocksdb::ColumnFamilyOptions RocksDBOptionFeature::getColumnFamilyOptions(
       family == RocksDBColumnFamilyManager::Family::MdiVPackIndex) {
     // partition .sst files by object id prefix
     if (_partitionFilesForMdiIndexCf) {
+      result.sst_partitioner_factory =
+          rocksdb::NewSstPartitionerFixedPrefixFactory(sizeof(uint64_t));
+    }
+  }
+  if (family == RocksDBColumnFamilyManager::Family::VectorIndex) {
+    // partition .sst files by object id prefix
+    if (_partitionFilesForVectorIndexCf) {
       result.sst_partitioner_factory =
           rocksdb::NewSstPartitionerFixedPrefixFactory(sizeof(uint64_t));
     }

@@ -435,26 +435,22 @@ futures::Future<Result> TransactionState::addCollection(
     if (auto data = raceController.waitForOthers(2, _id, vocbase().server());
         data) {
       TRI_ASSERT(data->size() == 2);
-      // Slice out the first char, then we have a number
-      uint32_t shardNum = basics::StringUtils::uint32(&cname.back(), 1);
-      if (shardNum % 2 == 0) {
-        auto min = *std::min_element(data->begin(), data->end(),
-                                     [](std::any const& a, std::any const& b) {
-                                       return std::any_cast<TransactionId>(a) <
-                                              std::any_cast<TransactionId>(b);
-                                     });
-        if (_id == std::any_cast<TransactionId>(min)) {
-          std::this_thread::sleep_for(std::chrono::milliseconds(5));
+      auto sleeperId = std::invoke([&]() {
+        // Slice out the first char, then we have a number
+        uint32_t shardNum = basics::StringUtils::uint32(&cname.back(), 1);
+        auto comp = [](std::any const& a, std::any const& b) {
+          return std::any_cast<TransactionId>(a) <
+                 std::any_cast<TransactionId>(b);
+        };
+        if (shardNum % 2 == 0) {
+          return *std::min_element(data->begin(), data->end(), comp);
+        } else {
+          return *std::max_element(data->begin(), data->end(), comp);
         }
-      } else {
-        auto max = *std::max_element(data->begin(), data->end(),
-                                     [](std::any const& a, std::any const& b) {
-                                       return std::any_cast<TransactionId>(a) <
-                                              std::any_cast<TransactionId>(b);
-                                     });
-        if (_id == std::any_cast<TransactionId>(max)) {
-          std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        }
+      });
+
+      if (_id == std::any_cast<TransactionId>(sleeperId)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
       }
     }
   }
@@ -527,20 +523,20 @@ futures::Future<Result> TransactionState::addCollectionInternal(
       !_options.allowImplicitCollectionsForWrite) {
     // trying to write access a collection that was not declared at start.
     // this is only supported internally for replication transactions.
-    co_return res.reset(TRI_ERROR_TRANSACTION_UNREGISTERED_COLLECTION,
-                        std::string(TRI_errno_string(
-                            TRI_ERROR_TRANSACTION_UNREGISTERED_COLLECTION)) +
-                            ": " + std::string{cname} + " [" +
-                            AccessMode::typeString(accessType) + "]");
+    co_return res.reset(
+        TRI_ERROR_TRANSACTION_UNREGISTERED_COLLECTION,
+        absl::StrCat(
+            TRI_errno_string(TRI_ERROR_TRANSACTION_UNREGISTERED_COLLECTION),
+            ": ", cname, " [", AccessMode::typeString(accessType), "]"));
   }
 
   if (!AccessMode::isWriteOrExclusive(accessType) &&
       (isRunning() && !_options.allowImplicitCollectionsForRead)) {
-    co_return res.reset(TRI_ERROR_TRANSACTION_UNREGISTERED_COLLECTION,
-                        std::string(TRI_errno_string(
-                            TRI_ERROR_TRANSACTION_UNREGISTERED_COLLECTION)) +
-                            ": " + std::string{cname} + " [" +
-                            AccessMode::typeString(accessType) + "]");
+    co_return res.reset(
+        TRI_ERROR_TRANSACTION_UNREGISTERED_COLLECTION,
+        absl::StrCat(
+            TRI_errno_string(TRI_ERROR_TRANSACTION_UNREGISTERED_COLLECTION),
+            ": ", cname, " [", AccessMode::typeString(accessType), "]"));
   }
 
   // now check the permissions
@@ -643,6 +639,50 @@ void TransactionState::setExclusiveAccessType() {
   _type = AccessMode::Type::EXCLUSIVE;
 }
 
+/// @brief whether or not a transaction is read-only
+bool TransactionState::isReadOnlyTransaction() const noexcept {
+  return _type == AccessMode::Type::READ;
+}
+
+/// @brief whether or not a transaction is a follower transaction
+bool TransactionState::isFollowerTransaction() const noexcept {
+  return hasHint(transaction::Hints::Hint::IS_FOLLOWER_TRX);
+}
+
+/// @brief servers already contacted
+containers::FlatHashSet<ServerID> const& TransactionState::knownServers()
+    const noexcept {
+  return _knownServers;
+}
+
+bool TransactionState::knowsServer(std::string_view uuid) const noexcept {
+  TRI_ASSERT(!uuid.empty());
+  if (uuid.starts_with('_')) {
+    uuid = uuid.substr(1);
+  }
+  return _knownServers.contains(uuid);
+}
+
+/// @brief add a server to the known set
+void TransactionState::addKnownServer(std::string_view uuid) {
+  TRI_ASSERT(!uuid.empty());
+  if (uuid.starts_with('_')) {
+    uuid = uuid.substr(1);
+  }
+  _knownServers.emplace(uuid);
+}
+
+/// @brief remove a server from the known set
+void TransactionState::removeKnownServer(std::string_view uuid) {
+  TRI_ASSERT(!uuid.empty());
+  if (uuid.starts_with('_')) {
+    uuid = uuid.substr(1);
+  }
+  _knownServers.erase(uuid);
+}
+
+void TransactionState::clearKnownServers() { _knownServers.clear(); }
+
 void TransactionState::acceptAnalyzersRevision(
     QueryAnalyzerRevisions const& analyzersRevision) noexcept {
   // only init from default allowed! Or we have problem -> different
@@ -650,7 +690,7 @@ void TransactionState::acceptAnalyzersRevision(
   LOG_TOPIC_IF("9127a", ERR, Logger::AQL,
                (_analyzersRevision != analyzersRevision &&
                 !_analyzersRevision.isDefault()))
-      << " Changing analyzers revision for transaction from "
+      << "Changing analyzers revision for transaction from "
       << _analyzersRevision << " to " << analyzersRevision;
   TRI_ASSERT(_analyzersRevision == analyzersRevision ||
              _analyzersRevision.isDefault());

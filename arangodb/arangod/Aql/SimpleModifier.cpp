@@ -26,11 +26,10 @@
 #include "Aql/AqlValue.h"
 #include "Aql/Collection.h"
 #include "Aql/ExecutionEngine.h"
-#include "Aql/ModificationExecutor.h"
-#include "Aql/ModificationExecutorHelpers.h"
+#include "Aql/Executor/ModificationExecutor.h"
+#include "Aql/Executor/ModificationExecutorHelpers.h"
 #include "Aql/OutputAqlItemRow.h"
 #include "Aql/SharedQueryState.h"
-#include "Basics/Common.h"
 #include "Basics/StaticStrings.h"
 #include "Basics/StringUtils.h"
 #include "Basics/VelocyPackHelper.h"
@@ -187,15 +186,8 @@ ExecutionState SimpleModifier<ModifierCompletion, Enable>::transact(
 
   auto result = _completion.transact(trx, _accumulator.closeAndGetContents());
 
-  // we are currently waiting here for the `result` future to get
-  // ready before we continue. this makes the AQL modification
-  // operations blocking as in previous versions of ArangoDB.
-  // TODO: fix this and make it truly non-blocking (requires to
-  // fix some lifecycle issues for AQL queries first).
-  result.wait();
-
   if (result.isReady()) {
-    _results = std::move(result.get());
+    _results = std::move(result.waitAndGet());
     return ExecutionState::DONE;
   }
 
@@ -339,6 +331,9 @@ SimpleModifier<ModifierCompletion, Enable>::getResultsIterator() const {
 template<typename ModifierCompletion, typename Enable>
 bool SimpleModifier<ModifierCompletion, Enable>::hasResultOrException()
     const noexcept {
+  // Note that this is never called while the modifier is running, that's why we
+  // don't need to lock _resultMutex. This way possible unintended races might
+  // be revealed by TSan.
   return std::visit(overload{
                         [](NoResult) { return false; },
                         [](Waiting) { return false; },
@@ -352,6 +347,9 @@ template<typename ModifierCompletion, typename Enable>
 bool SimpleModifier<ModifierCompletion,
                     Enable>::hasNeitherResultNorOperationPending()
     const noexcept {
+  // Note that this is never called while the modifier is running, that's why we
+  // don't need to lock _resultMutex. This way possible unintended races might
+  // be revealed by TSan.
   return std::visit(overload{
                         [](NoResult) { return true; },
                         [](Waiting) { return false; },
@@ -359,6 +357,11 @@ bool SimpleModifier<ModifierCompletion,
                         [](std::exception_ptr const&) { return false; },
                     },
                     _results);
+}
+
+template<typename ModifierCompletion, typename Enable>
+void SimpleModifier<ModifierCompletion, Enable>::stopAndClear() noexcept {
+  _operations.clear();
 }
 
 template class ::arangodb::aql::SimpleModifier<InsertModifierCompletion>;

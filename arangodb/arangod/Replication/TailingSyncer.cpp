@@ -470,14 +470,13 @@ Result TailingSyncer::processDocument(TRI_replication_operation_e type,
 
     trx->addCollectionAtRuntime(coll->id(), coll->name(),
                                 AccessMode::Type::EXCLUSIVE)
-        .get();
+        .waitAndGet();
     std::string conflictingDocumentKey;
     Result r = applyCollectionDumpMarker(*trx, coll.get(), type, applySlice,
                                          conflictingDocumentKey);
     TRI_ASSERT(!r.is(TRI_ERROR_ARANGO_TRY_AGAIN));
 
-    if (r.errorNumber() == TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED &&
-        isSystem) {
+    if (r.is(TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED) && isSystem) {
       // ignore unique constraint violations for system collections
       r.reset();
     }
@@ -553,8 +552,7 @@ Result TailingSyncer::processDocument(TRI_replication_operation_e type,
       continue;
     }
 
-    if (res.errorNumber() == TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED &&
-        isSystem) {
+    if (res.is(TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED) && isSystem) {
       // ignore unique constraint violations for system collections
       res.reset();
     }
@@ -880,7 +878,7 @@ Result TailingSyncer::truncateCollection(
 
     OperationOptions opts(ExecContext::current());
     OperationResult opRes =
-        trx.count(col->name(), transaction::CountType::Normal, opts);
+        trx.count(col->name(), transaction::CountType::kNormal, opts);
     if (opRes.ok() && opRes.slice().isNumber()) {
       count = opRes.slice().getNumber<uint64_t>();
     }
@@ -1115,6 +1113,7 @@ Result TailingSyncer::applyLog(SimpleHttpResult* response,
                                ApplyStats& applyStats,
                                arangodb::velocypack::Builder& builder,
                                uint64_t& ignoreCount) {
+  bool isVPack = replutils::isVelocyPack(*response);
   // reload users if they were modified
   _usersModified = false;
   _analyzersModified.clear();
@@ -1155,37 +1154,43 @@ Result TailingSyncer::applyLog(SimpleHttpResult* response,
   TRI_ASSERT(*end == '\0');
 
   while (p < end) {
-    char const* q = static_cast<char const*>(memchr(p, '\n', (end - p)));
-
-    if (q == nullptr) {
-      q = end;
-    }
-
     char const* lineStart = p;
-    size_t const lineLength = q - p;
+    size_t lineLength = 0;
+    VPackSlice slice;
+    if (!isVPack) {
+      char const* q = static_cast<char const*>(memchr(p, '\n', (end - p)));
 
-    if (lineLength < 2) {
-      // we are done
-      return Result();
+      if (q == nullptr) {
+        q = end;
+      }
+
+      size_t const lineLength = q - p;
+
+      if (lineLength < 2) {
+        // we are done
+        return Result();
+      }
+
+      TRI_ASSERT(q <= end);
+
+      builder.clear();
+      try {
+        VPackParser parser(builder);
+        parser.parse(p, static_cast<size_t>(q - p));
+      } catch (std::exception const& ex) {
+        return Result(TRI_ERROR_HTTP_CORRUPTED_JSON, ex.what());
+      } catch (...) {
+        return Result(TRI_ERROR_OUT_OF_MEMORY);
+      }
+
+      p = q + 1;
+      slice = builder.slice();
+    } else {
+      slice = VPackSlice{reinterpret_cast<uint8_t const*>(p)};
+      lineLength = slice.byteSize();
+      p += lineLength;
     }
-
-    TRI_ASSERT(q <= end);
-
     applyStats.processedMarkers++;
-
-    builder.clear();
-    try {
-      VPackParser parser(builder);
-      parser.parse(p, static_cast<size_t>(q - p));
-    } catch (std::exception const& ex) {
-      return Result(TRI_ERROR_HTTP_CORRUPTED_JSON, ex.what());
-    } catch (...) {
-      return Result(TRI_ERROR_OUT_OF_MEMORY);
-    }
-
-    p = q + 1;
-
-    VPackSlice const slice = builder.slice();
 
     if (!slice.isObject()) {
       return Result(TRI_ERROR_REPLICATION_INVALID_RESPONSE,
@@ -1663,7 +1668,7 @@ Result TailingSyncer::runContinuousSync() {
   // the shared status will wait in its destructor until all posted
   // requests have been completed/canceled!
   auto self = shared_from_this();
-  auto sharedStatus = std::make_shared<Syncer::JobSynchronizer>(self);
+  Syncer::JobSynchronizerScope sharedStatus(self);
 
   bool worked = false;
   bool mustFetchBatch = true;
@@ -1684,7 +1689,7 @@ Result TailingSyncer::runContinuousSync() {
     // false" to processLeaderLog requires that processLeaderLog has already
     // requested the next batch in the background on the previous invocation
     Result res = processLeaderLog(
-        sharedStatus, builder, fetchTick, lastScannedTick, fromTick,
+        sharedStatus.clone(), builder, fetchTick, lastScannedTick, fromTick,
         _state.applier._ignoreErrors, worked, mustFetchBatch);
 
     uint64_t sleepTime;
@@ -1998,10 +2003,10 @@ Result TailingSyncer::processLeaderLog(
     // do not fetch the same batch next time we enter processLeaderLog
     // (that would be duplicate work)
     mustFetchBatch = false;
-    sharedStatus->request([this, self = shared_from_this(), sharedStatus,
-                           fetchTick, lastScannedTick, firstRegularTick]() {
-      fetchLeaderLog(sharedStatus, fetchTick, lastScannedTick,
-                     firstRegularTick);
+    sharedStatus->request([self = shared_from_this(), sharedStatus, fetchTick,
+                           lastScannedTick, firstRegularTick]() {
+      std::static_pointer_cast<TailingSyncer>(self)->fetchLeaderLog(
+          sharedStatus, fetchTick, lastScannedTick, firstRegularTick);
     });
   }
 

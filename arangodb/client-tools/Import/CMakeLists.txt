@@ -4,7 +4,11 @@ add_library(arangoimport_utils OBJECT
   ImportHelper.cpp
   SenderThread.cpp)
 target_include_directories(arangoimport_utils PRIVATE ${PROJECT_SOURCE_DIR}/client-tools)
-target_link_libraries(arangoimport_utils arango)
+target_link_libraries(arangoimport_utils 
+    arango_basic_utils
+    arango_basic_errors
+    arango_basic_logger
+)
 
 add_executable(${BIN_ARANGOIMPORT}
   ${ProductVersionFiles_arangoimport}
@@ -38,9 +42,7 @@ if (USE_JEMALLOC)
   add_dependencies(${BIN_ARANGOIMPORT} jemalloc_build)
 endif ()
 
-if (UNIX) 
-  add_dependencies(${BIN_ARANGOIMPORT} man)
-endif ()
+add_dependencies(${BIN_ARANGOIMPORT} man)
 
 install_command_alias(${BIN_ARANGOIMPORT}
   ${CMAKE_INSTALL_BINDIR}

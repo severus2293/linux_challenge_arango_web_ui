@@ -37,7 +37,7 @@ using namespace arangodb::aql;
 /// @brief create the function
 Function::Function(std::string const& name, char const* arguments,
                    std::underlying_type<Flags>::type flags,
-                   FunctionImplementation implementation)
+                   functions::FunctionImplementation implementation)
     : name(name),
       arguments(arguments),
       flags(flags),
@@ -82,7 +82,7 @@ Function::Function(std::string const& name, char const* arguments,
 #ifdef ARANGODB_USE_GOOGLE_TESTS
 // constructor to create a function stub. only used from tests
 Function::Function(std::string const& name,
-                   FunctionImplementation implementation)
+                   functions::FunctionImplementation implementation)
     : name(name),
       arguments("."),
       flags(makeFlags()),
@@ -158,6 +158,22 @@ void Function::initializeArguments() {
         } else if (conversions[position] == Conversion::None) {
           // we already had a parameter at this position
           conversions[position] = Conversion::Optional;
+        }
+        foundArg = true;
+        break;
+
+      case 'b':
+        // we found an arbitrary other parameter, but if it is a bind
+        // parameter, it must be expanded early
+
+        // set the conversion info for the position
+        if (conversions.size() <= position) {
+          // we don't yet have another parameter at this position
+          conversions.emplace_back(Conversion::RequiredBindParameter);
+        } else {
+          // we already had a parameter at this position - should not happen
+          TRI_ASSERT(false);
+          conversions[position] = Conversion::RequiredBindParameter;
         }
         foundArg = true;
         break;

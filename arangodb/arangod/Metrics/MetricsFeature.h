@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include "ApplicationFeatures/LazyApplicationFeatureReference.h"
 #include "Basics/DownCast.h"
 #include "Containers/FlatHashMap.h"
 #include "Metrics/Batch.h"
@@ -41,7 +42,7 @@
 
 namespace arangodb::metrics {
 
-class MetricsFeature final : public ArangodFeature {
+class MetricsFeature final : public ApplicationFeature {
  public:
   enum class UsageTrackingMode {
     // no tracking
@@ -54,7 +55,18 @@ class MetricsFeature final : public ArangodFeature {
 
   static constexpr std::string_view name() noexcept { return "Metrics"; }
 
-  explicit MetricsFeature(Server& server);
+  template<typename Server>
+  explicit MetricsFeature(
+      Server& server,
+      LazyApplicationFeatureReference<QueryRegistryFeature>
+          lazyQueryRegistryFeatureRef,
+      LazyApplicationFeatureReference<StatisticsFeature>
+          lazyStatisticsFeatureRef,
+      LazyApplicationFeatureReference<EngineSelectorFeature>
+          lazyEngineSelectorFeatureRef,
+      LazyApplicationFeatureReference<ClusterMetricsFeature>
+          lazyClusterMetricsFeatureRef,
+      LazyApplicationFeatureReference<ClusterFeature> lazyClusterFeatureRef);
 
   bool exportAPI() const noexcept;
   bool ensureWhitespace() const noexcept;
@@ -67,6 +79,15 @@ class MetricsFeature final : public ArangodFeature {
   template<typename MetricBuilder>
   auto add(MetricBuilder&& builder) -> typename MetricBuilder::MetricT& {
     return static_cast<typename MetricBuilder::MetricT&>(*doAdd(builder));
+  }
+
+  // tries to add the metric. If the metric already exists, it is returned
+  // instead.
+  template<typename MetricBuilder>
+  auto ensureMetric(MetricBuilder&& builder) ->
+      typename MetricBuilder::MetricT& {
+    return static_cast<typename MetricBuilder::MetricT&>(
+        *doEnsureMetric(builder));
   }
 
   template<typename MetricBuilder>
@@ -85,6 +106,7 @@ class MetricsFeature final : public ArangodFeature {
 
   Metric* get(MetricKeyView const& key) const;
   bool remove(Builder const& builder);
+  bool remove(Metric const& m);
 
   void toPrometheus(std::string& result, MetricsParts metricsParts,
                     CollectMode mode) const;
@@ -110,10 +132,28 @@ class MetricsFeature final : public ArangodFeature {
       std::string_view name) const;
   void batchRemove(std::string_view name, std::string_view labels);
 
+  void prepare() override;
+
  private:
   std::shared_ptr<Metric> doAdd(Builder& builder);
   std::shared_ptr<Metric> doAddDynamic(Builder& builder);
+  std::shared_ptr<Metric> doEnsureMetric(Builder& builder);
   std::shared_lock<std::shared_mutex> initGlobalLabels() const;
+
+  LazyApplicationFeatureReference<QueryRegistryFeature>
+      _lazyQueryRegistryFeatureRef;
+  LazyApplicationFeatureReference<StatisticsFeature> _lazyStatisticsFeatureRef;
+  LazyApplicationFeatureReference<EngineSelectorFeature>
+      _lazyEngineSelectorFeatureRef;
+  LazyApplicationFeatureReference<ClusterMetricsFeature>
+      _lazyClusterMetricsFeatureRef;
+  LazyApplicationFeatureReference<ClusterFeature> _lazyClusterFeatureRef;
+
+  QueryRegistryFeature* _queryRegistryFeature = nullptr;
+  StatisticsFeature* _statisticsFeature = nullptr;
+  EngineSelectorFeature* _engineSelectorFeature = nullptr;
+  ClusterMetricsFeature* _clusterMetricsFeature = nullptr;
+  ClusterFeature* _clusterFeature = nullptr;
 
   mutable std::shared_mutex _mutex;
 

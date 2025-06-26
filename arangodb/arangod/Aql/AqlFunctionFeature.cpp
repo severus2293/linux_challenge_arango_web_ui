@@ -24,13 +24,10 @@
 #include "AqlFunctionFeature.h"
 
 #include "ApplicationFeatures/ApplicationServer.h"
-#include "Aql/AstNode.h"
 #include "Aql/Function.h"
+#include "Aql/Functions.h"
 #include "Basics/StringUtils.h"
-#include "Cluster/ServerState.h"
-#include "FeaturePhases/ClusterFeaturePhase.h"
-#include "StorageEngine/EngineSelectorFeature.h"
-#include "StorageEngine/StorageEngine.h"
+#include "RestServer/VectorIndexFeature.h"
 
 using namespace arangodb::application_features;
 
@@ -66,15 +63,17 @@ void AqlFunctionFeature::prepare() {
 
 void AqlFunctionFeature::add(Function const& func) {
   TRI_ASSERT(func.name == basics::StringUtils::toupper(func.name));
-  TRI_ASSERT(_functionNames.find(func.name) == _functionNames.end());
-  // add function to the map
-  _functionNames.try_emplace(func.name, func);
+  _functionNames.doUnderLock(
+      [&](auto& functions) { functions.try_emplace(func.name, func); });
 }
 
 void AqlFunctionFeature::addAlias(std::string const& alias,
                                   std::string const& original) {
-  auto it = _functionNames.find(original);
-  TRI_ASSERT(it != _functionNames.end());
+  auto it = _functionNames.doUnderLock([&](auto const& functions) {
+    auto it = functions.find(original);
+    TRI_ASSERT(it != functions.end());
+    return it;
+  });
 
   // intentionally copy original function, as we want to give it another name
   Function aliasFunction = (*it).second;
@@ -85,29 +84,33 @@ void AqlFunctionFeature::addAlias(std::string const& alias,
 
 void AqlFunctionFeature::toVelocyPack(VPackBuilder& builder) const {
   builder.openArray();
-  for (auto const& it : _functionNames) {
-    if (it.second.hasFlag(FF::Internal)) {
-      // don't serialize internal functions
-      continue;
+  _functionNames.doUnderLock([&](auto const& functions) {
+    for (auto const& it : functions) {
+      if (it.second.hasFlag(FF::Internal)) {
+        // don't serialize internal functions
+        continue;
+      }
+      it.second.toVelocyPack(builder);
     }
-    it.second.toVelocyPack(builder);
-  }
+  });
   builder.close();
 }
 
 bool AqlFunctionFeature::exists(std::string const& name) const {
-  auto it = _functionNames.find(name);
-
-  return it != _functionNames.end();
+  return _functionNames.doUnderLock(
+      [&](auto const& functions) { return functions.contains(name); });
 }
 
 Function const* AqlFunctionFeature::byName(std::string const& name) const {
-  auto it = _functionNames.find(name);
+  auto it = _functionNames.doUnderLock([&](auto const& functions) {
+    auto it = functions.find(name);
 
-  if (it == _functionNames.end()) {
-    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_NAME_UNKNOWN,
-                                  name.c_str());
-  }
+    if (it == functions.end()) {
+      THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_NAME_UNKNOWN,
+                                    name.c_str());
+    }
+    return it;
+  });
 
   // return the address of the function
   return &((*it).second);
@@ -117,7 +120,9 @@ Function const* AqlFunctionFeature::byName(std::string const& name) const {
 // ------------------------------------------------------
 //
 // . = argument of any type (except collection)
-// c = collection name, will be converted into list with documents
+// b = argument of any type. if it is a bind parameter it
+//     will be marked as a required bind parameter that will
+//     be expanded early in the query processing pipeline
 // h = collection name, will be converted into string
 // , = next argument
 // | = separates mandatory from optional arguments
@@ -396,6 +401,7 @@ void AqlFunctionFeature::addDocumentFunctions() {
   add({"KEEP_RECURSIVE", ".,.|+", flags, &functions::KeepRecursive});
   add({"TRANSLATE", ".,.|.", flags, &functions::Translate});
   add({"ZIP", ".,.", flags, &functions::Zip});
+  add({"ENTRIES", ".", flags, &functions::Entries});
   add({"JSON_STRINGIFY", ".", flags, &functions::JsonStringify});
   add({"JSON_PARSE", ".", flags, &functions::JsonParse});
 
@@ -589,6 +595,19 @@ void AqlFunctionFeature::addMiscFunctions() {
                            FF::CanRunOnDBServerCluster,
                            FF::CanRunOnDBServerOneShard),
        &functions::MakeDistributeGraphInput});
+
+  if (server().getFeature<VectorIndexFeature>().isVectorIndexEnabled()) {
+    add({"APPROX_NEAR_COSINE", ".,.|.",
+         Function::makeFlags(FF::Deterministic, FF::Cacheable,
+                             FF::CanRunOnDBServerCluster,
+                             FF::CanRunOnDBServerOneShard),
+         &functions::ApproxNearCosine});
+    add({"APPROX_NEAR_L2", ".,.|.",
+         Function::makeFlags(FF::Deterministic, FF::Cacheable,
+                             FF::CanRunOnDBServerCluster,
+                             FF::CanRunOnDBServerOneShard),
+         &functions::ApproxNearL2});
+  }
 #ifdef USE_ENTERPRISE
   add({"SELECT_SMART_DISTRIBUTE_GRAPH_INPUT", ".,.",
        Function::makeFlags(FF::Deterministic, FF::Cacheable, FF::Internal,

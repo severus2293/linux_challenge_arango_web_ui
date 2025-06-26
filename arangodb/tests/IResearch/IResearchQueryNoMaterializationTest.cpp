@@ -26,9 +26,9 @@
 #include <velocypack/Iterator.h>
 
 #include "Aql/AqlFunctionFeature.h"
-#include "Aql/IResearchViewNode.h"
+#include "Aql/ExecutionNode/IResearchViewNode.h"
+#include "Aql/OptimizerRule.h"
 #include "Aql/Query.h"
-#include "Aql/OptimizerRulesFeature.h"
 #include "IResearch/ApplicationServerHelper.h"
 #include "IResearch/IResearchLink.h"
 #include "IResearch/IResearchLinkHelper.h"
@@ -160,7 +160,7 @@ class QueryTestMulti
             arangodb::aql::Function::Flags::CanRunOnDBServerCluster,
             arangodb::aql::Function::Flags::CanRunOnDBServerOneShard),
         [](arangodb::aql::ExpressionContext*, arangodb::aql::AstNode const&,
-           arangodb::aql::VPackFunctionParametersView params) {
+           arangodb::aql::functions::VPackFunctionParametersView params) {
           TRI_ASSERT(!params.empty());
           return params[0];
         }});
@@ -176,7 +176,7 @@ class QueryTestMulti
             arangodb::aql::Function::Flags::CanRunOnDBServerCluster,
             arangodb::aql::Function::Flags::CanRunOnDBServerOneShard),
         [](arangodb::aql::ExpressionContext*, arangodb::aql::AstNode const&,
-           arangodb::aql::VPackFunctionParametersView params) {
+           arangodb::aql::functions::VPackFunctionParametersView params) {
           TRI_ASSERT(!params.empty());
           return params[0];
         }});
@@ -245,8 +245,9 @@ class QueryNoMaterialization : public QueryTestMulti {
     arangodb::velocypack::Builder builder;
 
     builder.openObject();
-    view->properties(builder,
-                     arangodb::LogicalDataSource::Serialization::Properties);
+    auto res = view->properties(
+        builder, arangodb::LogicalDataSource::Serialization::Properties);
+    ASSERT_TRUE(res.ok());
     builder.close();
 
     auto slice = builder.slice();
@@ -284,10 +285,12 @@ class QueryNoMaterialization : public QueryTestMulti {
                "version": $1, $2
                "includeAllFields": true })",
           index, version(), addition));
-      logicalCollection1->createIndex(createJson->slice(), created).get();
+      logicalCollection1->createIndex(createJson->slice(), created)
+          .waitAndGet();
       ASSERT_TRUE(created);
       created = false;
-      logicalCollection2->createIndex(createJson->slice(), created).get();
+      logicalCollection2->createIndex(createJson->slice(), created)
+          .waitAndGet();
       ASSERT_TRUE(created);
     };
 
@@ -668,8 +671,9 @@ TEST_P(QueryNoMaterialization, testStoredValuesRecord) {
   arangodb::velocypack::Builder builder;
 
   builder.openObject();
-  view->properties(builder,
-                   arangodb::LogicalDataSource::Serialization::Properties);
+  auto res = view->properties(
+      builder, arangodb::LogicalDataSource::Serialization::Properties);
+  ASSERT_TRUE(res.ok());
   builder.close();
 
   auto slice = builder.slice();
@@ -832,8 +836,9 @@ TEST_P(QueryNoMaterialization, testStoredValuesRecordWithCompression) {
   arangodb::velocypack::Builder builder;
 
   builder.openObject();
-  view->properties(builder,
-                   arangodb::LogicalDataSource::Serialization::Properties);
+  auto res = view->properties(
+      builder, arangodb::LogicalDataSource::Serialization::Properties);
+  ASSERT_TRUE(res.ok());
   builder.close();
 
   auto slice = builder.slice();

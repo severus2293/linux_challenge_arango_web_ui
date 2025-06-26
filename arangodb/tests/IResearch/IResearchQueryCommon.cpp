@@ -133,7 +133,7 @@ IResearchQueryTest::IResearchQueryTest() : server{false} {
           arangodb::aql::Function::Flags::CanRunOnDBServerCluster,
           arangodb::aql::Function::Flags::CanRunOnDBServerOneShard),
       [](arangodb::aql::ExpressionContext*, arangodb::aql::AstNode const&,
-         arangodb::aql::VPackFunctionParametersView params) {
+         arangodb::aql::functions::VPackFunctionParametersView params) {
         TRI_ASSERT(!params.empty());
         return params[0];
       }});
@@ -149,7 +149,7 @@ IResearchQueryTest::IResearchQueryTest() : server{false} {
           arangodb::aql::Function::Flags::CanRunOnDBServerCluster,
           arangodb::aql::Function::Flags::CanRunOnDBServerOneShard),
       [](arangodb::aql::ExpressionContext*, arangodb::aql::AstNode const&,
-         arangodb::aql::VPackFunctionParametersView params) {
+         arangodb::aql::functions::VPackFunctionParametersView params) {
         TRI_ASSERT(!params.empty());
         return params[0];
       }});
@@ -307,7 +307,7 @@ void QueryTest::createIndexes(std::string_view definition1,
         version(), definition1));
     auto collection = _vocbase.lookupCollection("testCollection0");
     ASSERT_TRUE(collection);
-    collection->createIndex(createJson->slice(), created).get();
+    collection->createIndex(createJson->slice(), created).waitAndGet();
     ASSERT_TRUE(created);
   }
   // testIndex1
@@ -321,7 +321,7 @@ void QueryTest::createIndexes(std::string_view definition1,
         version(), definition2));
     auto collection = _vocbase.lookupCollection("testCollection1");
     ASSERT_TRUE(collection);
-    collection->createIndex(createJson->slice(), created).get();
+    collection->createIndex(createJson->slice(), created).waitAndGet();
     EXPECT_TRUE(created);
   }
 }

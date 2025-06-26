@@ -236,17 +236,15 @@ let helpArangoCollection = arangosh.createHelpHeadline('ArangoCollection help') 
   '  properties()                          show collection properties        ' + '\n' +
   '  properties(<data>)                    change collection properties      ' + '\n' +
   '  drop()                                delete a collection               ' + '\n' +
-  '  load()                                load a collection                 ' + '\n' +
-  '  unload()                              unload a collection               ' + '\n' +
   '  rename(<new-name>)                    renames a collection              ' + '\n' +
-  '  getIndexes()                          return defined indexes            ' + '\n' +
+  '  indexes()                             return defined indexes            ' + '\n' +
   '  refresh()                             refresh the status and name       ' + '\n' +
   '  _help()                               this help                         ' + '\n' +
   '                                                                          ' + '\n' +
   'Document Functions:                                                       ' + '\n' +
   '  count()                               return number of documents        ' + '\n' +
-  '  save(<data>)                          create document and return handle ' + '\n' +
-  '  document(<id>)                        get document by handle (_id or _key)' + '\n' +
+  '  save(<data>) / insert(<data>)         create document, return metadata  ' + '\n' +
+  '  document(<id>)                        get document by _key or _id       ' + '\n' +
   '  replace(<id>, <data>, <overwrite>)    overwrite document                ' + '\n' +
   '  update(<id>, <data>, <overwrite>,     partially update document         ' + '\n' +
   '         <keepNull>)                                                      ' + '\n' +
@@ -1424,7 +1422,7 @@ ArangoCollection.prototype._revisionTreeVerification = function() {
     throw "Could not create batch!";
   }
   let requestResult = this._database._connection.GET(this._prefixurl(
-    `/_api/replication/revisions/tree?collection=${encodeURIComponent(this._name)}&verification=true&batchId=${batch.id}`));
+    `/_api/replication/revisions/tree?collection=${encodeURIComponent(this._name)}&verification=true&batchId=${batch.id}&onlyPopulated=false`));
   this._database._connection.DELETE(this._prefixurl(
     `/_api/replication/batch/${batch.id}`));
   return requestResult;

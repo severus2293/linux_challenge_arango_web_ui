@@ -1613,7 +1613,11 @@ static void JS_PropagateSelfHeal(
     std::vector<network::FutureRes> futures;
 
     network::RequestOptions options;
+#ifdef USE_COVERAGE
+    options.timeout = network::Timeout(40.0);
+#else
     options.timeout = network::Timeout(10.0);
+#endif
     options.database = vocbase.name();
 
     // send an empty body
@@ -1644,7 +1648,7 @@ static void JS_PropagateSelfHeal(
     Result res;
 
     if (!futures.empty()) {
-      auto responses = futures::collectAll(futures).get();
+      auto responses = futures::collectAll(futures).waitAndGet();
       for (auto const& it : responses) {
         auto& resp = it.get();
         res.reset(resp.combinedResult());

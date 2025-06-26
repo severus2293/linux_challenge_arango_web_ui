@@ -27,9 +27,8 @@
 #include <velocypack/Iterator.h>
 
 #include "Aql/AqlFunctionFeature.h"
-#include "Aql/ExecutionNode.h"
 #include "Aql/ExecutionPlan.h"
-#include "Aql/OptimizerRulesFeature.h"
+#include "Aql/OptimizerRule.h"
 #include "Aql/Query.h"
 #include "Aql/QueryRegistry.h"
 #include "IResearch/ApplicationServerHelper.h"
@@ -47,11 +46,16 @@
 #include "Utils/OperationOptions.h"
 #include "Utils/SingleCollectionTransaction.h"
 #include "VocBase/LogicalCollection.h"
+
 #include "search/boolean_filter.hpp"
 #include "search/levenshtein_filter.hpp"
 #include "search/prefix_filter.hpp"
 #include "search/range_filter.hpp"
 #include "search/term_filter.hpp"
+
+namespace arangodb::aql {
+class ExecutionNode;
+}
 
 namespace arangodb::tests {
 namespace {
@@ -170,7 +174,7 @@ class QueryTestMulti
             arangodb::aql::Function::Flags::CanRunOnDBServerCluster,
             arangodb::aql::Function::Flags::CanRunOnDBServerOneShard),
         [](arangodb::aql::ExpressionContext*, arangodb::aql::AstNode const&,
-           arangodb::aql::VPackFunctionParametersView params) {
+           arangodb::aql::functions::VPackFunctionParametersView params) {
           TRI_ASSERT(!params.empty());
           return params[0];
         }});
@@ -186,7 +190,7 @@ class QueryTestMulti
             arangodb::aql::Function::Flags::CanRunOnDBServerCluster,
             arangodb::aql::Function::Flags::CanRunOnDBServerOneShard),
         [](arangodb::aql::ExpressionContext*, arangodb::aql::AstNode const&,
-           arangodb::aql::VPackFunctionParametersView params) {
+           arangodb::aql::functions::VPackFunctionParametersView params) {
           TRI_ASSERT(!params.empty());
           return params[0];
         }});
@@ -271,8 +275,9 @@ class QueryOptimization : public QueryTestMulti {
     arangodb::velocypack::Builder builder;
 
     builder.openObject();
-    view->properties(builder,
-                     arangodb::LogicalDataSource::Serialization::Properties);
+    auto res = view->properties(
+        builder, arangodb::LogicalDataSource::Serialization::Properties);
+    ASSERT_TRUE(res.ok());
     builder.close();
 
     auto slice = builder.slice();
@@ -318,7 +323,8 @@ class QueryOptimization : public QueryTestMulti {
                "version": $0,
                "includeAllFields": true })",
           version()));
-      logicalCollection1->createIndex(createJson->slice(), created).get();
+      logicalCollection1->createIndex(createJson->slice(), created)
+          .waitAndGet();
       ASSERT_TRUE(created);
       auto const viewDefinition = absl::Substitute(R"({ "indexes": [
         { "collection": "collection_1", "index": "index_1"}

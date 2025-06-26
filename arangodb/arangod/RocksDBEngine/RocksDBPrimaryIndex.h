@@ -107,10 +107,10 @@ class RocksDBPrimaryIndex final : public RocksDBIndex {
       transaction::Methods& trx, aql::AstNode* node,
       aql::Variable const* reference) const override;
 
-  bool supportsStreamInterface(
+  StreamSupportResult supportsStreamInterface(
       IndexStreamOptions const&) const noexcept override;
 
-  static bool checkSupportsStreamInterface(
+  static StreamSupportResult checkSupportsStreamInterface(
       std::vector<std::vector<basics::AttributeName>> const& coveredFields,
       IndexStreamOptions const&) noexcept;
 
@@ -170,5 +170,8 @@ class RocksDBPrimaryIndex final : public RocksDBIndex {
 
  private:
   std::vector<std::vector<basics::AttributeName>> const _coveredFields;
+
+  // maximum size of values to be stored in the in-memory cache
+  size_t const _maxCacheValueSize;
 };
 }  // namespace arangodb

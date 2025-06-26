@@ -28,7 +28,6 @@
 #include "Aql/QueryExecutionState.h"
 #include "Aql/QueryList.h"
 #include "Auth/TokenCache.h"
-#include "Basics/Common.h"
 #include "Basics/Exceptions.h"
 #include "Cluster/ClusterFeature.h"
 #include "Cluster/ClusterInfo.h"
@@ -41,6 +40,7 @@
 #include "Utils/ExecContext.h"
 #include "VocBase/vocbase.h"
 
+#include <absl/strings/str_cat.h>
 #include <velocypack/Builder.h>
 #include <velocypack/Iterator.h>
 #include <velocypack/Slice.h>
@@ -86,7 +86,7 @@ arangodb::Result getQueries(TRI_vocbase_t& vocbase, velocypack::Builder& out,
   arangodb::DatabaseFeature& databaseFeature =
       vocbase.server().getFeature<DatabaseFeature>();
 
-  std::vector<arangodb::aql::QueryEntryCopy> queries;
+  std::vector<std::shared_ptr<velocypack::String>> queries;
 
   // local case
   if (mode == QueriesMode::Slow) {
@@ -121,7 +121,7 @@ arangodb::Result getQueries(TRI_vocbase_t& vocbase, velocypack::Builder& out,
   out.openArray();
 
   for (auto const& q : queries) {
-    q.toVelocyPack(out);
+    out.add(q->slice());
   }
 
   if (ServerState::instance()->isCoordinator() && fanout) {
@@ -140,8 +140,8 @@ arangodb::Result getQueries(TRI_vocbase_t& vocbase, velocypack::Builder& out,
     options.param("local", "true");
     options.param("all", allDatabases ? "true" : "false");
 
-    std::string const url = std::string("/_api/query/") +
-                            (mode == QueriesMode::Slow ? "slow" : "current");
+    auto url = absl::StrCat("/_api/query/",
+                            (mode == QueriesMode::Slow ? "slow" : "current"));
 
     auto& ci = vocbase.server().getFeature<ClusterFeature>().clusterInfo();
     for (auto const& coordinator : ci.getCurrentCoordinators()) {
@@ -150,14 +150,14 @@ arangodb::Result getQueries(TRI_vocbase_t& vocbase, velocypack::Builder& out,
         continue;
       }
 
-      auto f = network::sendRequestRetry(
-          pool, "server:" + coordinator, fuerte::RestVerb::Get, url,
-          VPackBuffer<uint8_t>{}, options, network::addAuthorizationHeader({}));
+      auto f = network::sendRequestRetry(pool, "server:" + coordinator,
+                                         fuerte::RestVerb::Get, url,
+                                         VPackBuffer<uint8_t>{}, options);
       futures.emplace_back(std::move(f));
     }
 
     if (!futures.empty()) {
-      auto responses = futures::collectAll(futures).get();
+      auto responses = futures::collectAll(futures).waitAndGet();
       for (auto const& it : responses) {
         auto& resp = it.get();
         res.reset(resp.combinedResult());
@@ -253,13 +253,12 @@ Result Queries::clearSlow(TRI_vocbase_t& vocbase, bool allDatabases,
 
       auto f = network::sendRequestRetry(pool, "server:" + coordinator,
                                          fuerte::RestVerb::Delete,
-                                         "/_api/query/slow", body, options,
-                                         network::addAuthorizationHeader({}));
+                                         "/_api/query/slow", body, options);
       futures.emplace_back(std::move(f));
     }
 
     if (!futures.empty()) {
-      auto responses = futures::collectAll(futures).get();
+      auto responses = futures::collectAll(futures).waitAndGet();
       for (auto const& it : responses) {
         auto& resp = it.get();
         res.reset(resp.combinedResult());

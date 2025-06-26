@@ -99,13 +99,6 @@ std::chrono::milliseconds sleepTimeFromWaitTime(double waitTime) {
   return std::chrono::seconds(2);
 }
 
-bool isVelocyPack(httpclient::SimpleHttpResult const& response) {
-  bool found = false;
-  std::string const& cType =
-      response.getHeaderField(StaticStrings::ContentTypeHeader, found);
-  return found && cType == StaticStrings::MimeTypeVPack;
-}
-
 std::string const kTypeString = "type";
 std::string const kDataString = "data";
 
@@ -160,7 +153,7 @@ Result removeRevisions(transaction::Methods& trx, LogicalCollection& collection,
       auto fut =
           trx.state()->performIntermediateCommitIfRequired(collection.id());
       TRI_ASSERT(fut.isReady());
-      res = fut.get();
+      res = fut.waitAndGet();
     }
 
     stats.waitedForRemovals += TRI_microtime() - t;
@@ -310,7 +303,11 @@ Result fetchRevisions(NetworkFeature& netFeature, transaction::Methods& trx,
           .param("batchId", std::to_string(config.batch.id))
           .param("encodeAsHLC", encodeAsHLC ? "true" : "false");
       reqOptions.database = config.vocbase.name();
-      reqOptions.timeout = network::Timeout(25.0);
+      // We take a relatively generous timeout here, because we have seen
+      // cases in which the leader was under heavy load or RocksDB had
+      // a compaction debt or the user has relatively large documents,
+      // in which case a batch of 5000 can be relatively large.
+      reqOptions.timeout = network::Timeout(900.0);
       auto buffer = requestBuilder.steal();
       auto f = network::sendRequestRetry(
           pool, config.leader.endpoint, fuerte::RestVerb::Put, path,
@@ -329,7 +326,7 @@ Result fetchRevisions(NetworkFeature& netFeature, transaction::Methods& trx,
       TRI_ASSERT(futures.size() == shoppingLists.size());
       auto& f = futures.front();
       double tWait = TRI_microtime();
-      auto& val = f.get();
+      auto& val = f.waitAndGet();
       stats.waitedForDocs += TRI_microtime() - tWait;
       Result res = val.combinedResult();
       if (res.fail()) {
@@ -465,7 +462,11 @@ Result fetchRevisions(NetworkFeature& netFeature, transaction::Methods& trx,
             .param("serverId", state.localServerIdString)
             .param("batchId", std::to_string(config.batch.id))
             .param("encodeAsHLC", encodeAsHLC ? "true" : "false");
-        reqOptions.timeout = network::Timeout(25.0);
+        // We take a relatively generous timeout here, because we have seen
+        // cases in which the leader was under heavy load or RocksDB had
+        // a compaction debt or the user has relatively large documents,
+        // in which case a batch of 5000 can be relatively large.
+        reqOptions.timeout = network::Timeout(900.0);
         reqOptions.database = config.vocbase.name();
         auto buffer = requestBuilder.steal();
         auto f = network::sendRequestRetry(
@@ -495,7 +496,7 @@ Result fetchRevisions(NetworkFeature& netFeature, transaction::Methods& trx,
       auto fut =
           trx.state()->performIntermediateCommitIfRequired(collection.id());
       TRI_ASSERT(fut.isReady());
-      res = fut.get();
+      res = fut.waitAndGet();
 
       if (res.fail()) {
         return res;
@@ -844,7 +845,7 @@ Result DatabaseInitialSyncer::parseCollectionDump(
   char const* p = data.begin();
   char const* end = p + data.length();
 
-  if (isVelocyPack(*response)) {
+  if (replutils::isVelocyPack(*response)) {
     // received a velocypack response from the leader
 
     // intentional copy
@@ -1000,20 +1001,12 @@ void DatabaseInitialSyncer::fetchDumpChunk(
     std::string url =
         absl::StrCat(baseUrl, "&from=", fromTick, "&chunkSize=", chunkSize);
 
-    bool isVPack = false;
     auto headers = replutils::createHeaders();
-    if (_config.leader.version() >= 30800) {
-      // from 3.8 onwards, it is safe and also faster to retrieve vpack-encoded
-      // dumps. in previous versions there may be vpack encoding issues for the
-      // /_api/replication/dump responses.
-      headers[StaticStrings::Accept] = StaticStrings::MimeTypeVPack;
-      isVPack = true;
-    }
 
     _config.progress.set(absl::StrCat(
         "fetching leader collection dump for collection '", coll->name(),
-        "', type: ", typeString, ", format: ", (isVPack ? "vpack" : "json"),
-        ", id: ", leaderColl, ", batch ", batch, ", url: ", url));
+        "', type: ", typeString, ", format: vpack, id: ", leaderColl,
+        ", batch ", batch, ", url: ", url));
 
     double t = TRI_microtime();
 
@@ -1111,12 +1104,12 @@ Result DatabaseInitialSyncer::fetchCollectionDump(LogicalCollection* coll,
   // the shared status will wait in its destructor until all posted
   // requests have been completed/canceled!
   auto self = shared_from_this();
-  auto sharedStatus = std::make_shared<Syncer::JobSynchronizer>(self);
+  Syncer::JobSynchronizerScope sharedStatus(self);
 
   // order initial chunk. this will block until the initial response
   // has arrived
-  fetchDumpChunk(sharedStatus, baseUrl, coll, leaderColl, batch, fromTick,
-                 chunkSize);
+  fetchDumpChunk(sharedStatus.clone(), baseUrl, coll, leaderColl, batch,
+                 fromTick, chunkSize);
 
   while (true) {
     std::unique_ptr<httpclient::SimpleHttpResult> dumpResponse;
@@ -1188,16 +1181,17 @@ Result DatabaseInitialSyncer::fetchCollectionDump(LogicalCollection* coll,
     if (checkMore && !isAborted()) {
       // already fetch next batch in the background, by posting the
       // request to the scheduler, which can run it asynchronously
-      sharedStatus->request([this, self, baseUrl, sharedStatus, coll,
-                             leaderColl, batch, fromTick, chunkSize]() {
+      sharedStatus->request([self, baseUrl, sharedStatus = sharedStatus.clone(),
+                             coll, leaderColl, batch, fromTick, chunkSize]() {
         TRI_IF_FAILURE("Replication::forceCheckCancellation") {
           // we intentionally sleep here for a while, so the next call gets
           // executed after the scheduling thread has thrown its
           // TRI_ERROR_INTERNAL exception for our failure point
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
-        fetchDumpChunk(sharedStatus, baseUrl, coll, leaderColl, batch + 1,
-                       fromTick, chunkSize);
+        std::static_pointer_cast<DatabaseInitialSyncer>(self)->fetchDumpChunk(
+            sharedStatus, baseUrl, coll, leaderColl, batch + 1, fromTick,
+            chunkSize);
       });
       TRI_IF_FAILURE("Replication::forceCheckCancellation") {
         // forcefully abort replication once we have scheduled the job
@@ -1314,10 +1308,9 @@ Result DatabaseInitialSyncer::fetchCollectionSyncByKeys(
   // pessimistic wait of roughly 1e9/day and repeat the call without a quick
   // option.
   std::string const baseUrl = replutils::ReplicationUrl + "/keys";
-  std::string url = baseUrl + "?collection=" + urlEncode(leaderColl) +
-                    "&to=" + std::to_string(maxTick) +
-                    "&serverId=" + _state.localServerIdString +
-                    "&batchId=" + std::to_string(_config.batch.id);
+  std::string url = absl::StrCat(
+      baseUrl, "?collection=", urlEncode(leaderColl), "&to=", maxTick,
+      "&serverId=", _state.localServerIdString, "&batchId=", _config.batch.id);
 
   std::string msg = "fetching collection keys for collection '" + coll->name() +
                     "' from " + url;
@@ -1362,9 +1355,9 @@ Result DatabaseInitialSyncer::fetchCollectionSyncByKeys(
     if (!found) {
       ++stats.numFailedConnects;
       return Result(TRI_ERROR_REPLICATION_INVALID_RESPONSE,
-                    std::string("got invalid response from leader at ") +
-                        _config.leader.endpoint + url +
-                        ": could not find 'X-Arango-Async' header");
+                    absl::StrCat("got invalid response from leader at ",
+                                 _config.leader.endpoint, url,
+                                 ": could not find 'X-Arango-Async' header"));
     }
 
     double const startTime = TRI_microtime();
@@ -1397,8 +1390,8 @@ Result DatabaseInitialSyncer::fetchCollectionSyncByKeys(
           ++stats.numFailedConnects;
           stats.waitedForInitial += waitTime;
           return Result(TRI_ERROR_REPLICATION_NO_RESPONSE,
-                        std::string("job not found on leader at ") +
-                            _config.leader.endpoint);
+                        absl::StrCat("job not found on leader at ",
+                                     _config.leader.endpoint));
         }
       }
 
@@ -1409,8 +1402,8 @@ Result DatabaseInitialSyncer::fetchCollectionSyncByKeys(
         stats.waitedForInitial += waitTime;
         return Result(
             TRI_ERROR_REPLICATION_NO_RESPONSE,
-            std::string("timed out waiting for response from leader at ") +
-                _config.leader.endpoint);
+            absl::StrCat("timed out waiting for response from leader at ",
+                         _config.leader.endpoint));
       }
 
       if (isAborted()) {
@@ -1627,18 +1620,12 @@ void DatabaseInitialSyncer::fetchRevisionsChunk(
              urlEncode(requestResume.toHLC()) + "&encodeAsHLC=true";
     }
 
-    bool isVPack = false;
     auto headers = replutils::createHeaders();
-    if (_config.leader.version() >= 31000) {
-      headers[StaticStrings::Accept] = StaticStrings::MimeTypeVPack;
-      isVPack = true;
-    }
 
-    _config.progress.set(
-        std::string(
-            "fetching leader collection revision ranges for collection '") +
-        coll->name() + "', type: " + typeString + ", format: " +
-        (isVPack ? "vpack" : "json") + ", id: " + leaderColl + ", url: " + url);
+    _config.progress.set(absl::StrCat(
+        "fetching leader collection revision ranges for collection '",
+        coll->name(), "', type: ", typeString,
+        ", format: vpack, id: ", leaderColl, ", url: ", url));
 
     double t = TRI_microtime();
 
@@ -1726,14 +1713,15 @@ Result DatabaseInitialSyncer::fetchCollectionSyncByRevisions(
       stats.numSyncBytesReceived += response->getContentLength();
     }
 
-    auto body = response->getBodyVelocyPack();
-    if (!body) {
+    VPackBuilder body;
+    Result res = replutils::parseResponse(body, response.get());
+    if (res.fail()) {
       ++stats.numFailedConnects;
       return Result(
           TRI_ERROR_INTERNAL,
           "received improperly formed response when fetching revision tree");
     }
-    treeLeader = containers::RevisionTree::deserialize(body->slice());
+    treeLeader = containers::RevisionTree::deserialize(body.slice());
     if (!treeLeader) {
       ++stats.numFailedConnects;
       return Result(
@@ -1887,18 +1875,24 @@ Result DatabaseInitialSyncer::fetchCollectionSyncByRevisions(
   TRI_IF_FAILURE("SyncerNoEncodeAsHLC") { encodeAsHLC = false; }
 
   // now lets get the actual ranges and handle the differences
+  VPackBuilder requestBuilder;
   {
-    VPackBuilder requestBuilder;
-    {
-      VPackArrayBuilder list(&requestBuilder);
-      for (auto const& pair : ranges) {
-        VPackArrayBuilder range(&requestBuilder);
-        // ok to use only HLC encoding here.
-        requestBuilder.add(VPackValue(RevisionId{pair.first}.toHLC()));
-        requestBuilder.add(VPackValue(RevisionId{pair.second}.toHLC()));
-      }
+    VPackArrayBuilder list(&requestBuilder);
+    for (auto const& pair : ranges) {
+      VPackArrayBuilder range(&requestBuilder);
+      // ok to use only HLC encoding here.
+      requestBuilder.add(VPackValue(RevisionId{pair.first}.toHLC()));
+      requestBuilder.add(VPackValue(RevisionId{pair.second}.toHLC()));
     }
+  }
+  std::string const requestPayload = requestBuilder.slice().toJson();
 
+  std::string const url = absl::StrCat(
+      baseUrl, "/", RestReplicationHandler::Ranges,
+      "?collection=", urlEncode(leaderColl),
+      "&serverId=", _state.localServerIdString, "&batchId=", _config.batch.id);
+
+  {
     std::unique_ptr<ReplicationIterator> iter =
         physical->getReplicationIterator(
             ReplicationIterator::Ordering::Revision, *trx);
@@ -1954,12 +1948,6 @@ Result DatabaseInitialSyncer::fetchCollectionSyncByRevisions(
       return res;
     };
 
-    std::string const requestPayload = requestBuilder.slice().toJson();
-    std::string const url =
-        absl::StrCat(baseUrl, "/", RestReplicationHandler::Ranges,
-                     "?collection=", urlEncode(leaderColl),
-                     "&serverId=", _state.localServerIdString,
-                     "&batchId=", _config.batch.id);
     RevisionId requestResume{ranges[0].first};  // start with beginning
     RevisionId iterResume = requestResume;
     std::size_t chunk = 0;
@@ -1967,12 +1955,12 @@ Result DatabaseInitialSyncer::fetchCollectionSyncByRevisions(
     // the shared status will wait in its destructor until all posted
     // requests have been completed/canceled!
     auto self = shared_from_this();
-    auto sharedStatus = std::make_shared<Syncer::JobSynchronizer>(self);
+    Syncer::JobSynchronizerScope sharedStatus(self);
 
     // order initial chunk. this will block until the initial response
     // has arrived
-    fetchRevisionsChunk(sharedStatus, url, coll, leaderColl, requestPayload,
-                        requestResume);
+    fetchRevisionsChunk(sharedStatus.clone(), url, coll, leaderColl,
+                        requestPayload, requestResume);
 
     // Builder will be recycled
     VPackBuilder responseBuilder;
@@ -2001,7 +1989,7 @@ Result DatabaseInitialSyncer::fetchCollectionSyncByRevisions(
 
       VPackSlice slice;
 
-      if (isVelocyPack(*chunkResponse)) {
+      if (replutils::isVelocyPack(*chunkResponse)) {
         // velocypack body...
 
         // intentional copy of options
@@ -2065,10 +2053,12 @@ Result DatabaseInitialSyncer::fetchCollectionSyncByRevisions(
       if (requestResume < RevisionId::max() && !isAborted()) {
         // already fetch next chunk in the background, by posting the
         // request to the scheduler, which can run it asynchronously
-        sharedStatus->request([this, self, url, sharedStatus, coll, leaderColl,
-                               requestResume, &requestPayload]() {
-          fetchRevisionsChunk(sharedStatus, url, coll, leaderColl,
-                              requestPayload, requestResume);
+        sharedStatus->request([self, url, sharedStatus = sharedStatus.clone(),
+                               coll, leaderColl, requestResume,
+                               &requestPayload]() {
+          std::static_pointer_cast<DatabaseInitialSyncer>(self)
+              ->fetchRevisionsChunk(sharedStatus, url, coll, leaderColl,
+                                    requestPayload, requestResume);
         });
       }
 

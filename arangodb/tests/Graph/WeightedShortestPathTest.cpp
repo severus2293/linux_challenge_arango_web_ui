@@ -32,6 +32,7 @@
 #include "../Mocks/Servers.h"
 
 #include "Aql/Query.h"
+#include "Aql/Variable.h"
 #include "Basics/GlobalResourceMonitor.h"
 #include "Basics/ResourceUsage.h"
 #include "Basics/StaticStrings.h"
@@ -59,7 +60,7 @@ namespace graph {
 class WeightedShortestPathTest
     : public ::testing::TestWithParam<MockGraphProvider::LooseEndBehaviour> {
   using WeightedShortestPathFinder =
-      WeightedShortestPathEnumerator<MockGraphProvider>;
+      WeightedShortestPathEnumeratorAlias<MockGraphProvider>;
 
   static constexpr size_t minDepth = 0;
   static constexpr size_t maxDepth = std::numeric_limits<size_t>::max();

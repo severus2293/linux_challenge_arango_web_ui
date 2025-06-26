@@ -23,26 +23,30 @@
 
 #include "IResearchAqlAnalyzer.h"
 
-#include "utils/hash_utils.hpp"
-#include "utils/object_pool.hpp"
-
 #include "Aql/AqlCallList.h"
 #include "Aql/AqlCallStack.h"
 #include "Aql/AqlFunctionFeature.h"
+#include "Aql/Ast.h"
+#include "Aql/AstNode.h"
+#include "Aql/ExecutionNode/CalculationNode.h"
+#include "Aql/ExecutionPlan.h"
 #include "Aql/Expression.h"
 #include "Aql/FixedVarExpressionContext.h"
 #include "Aql/Optimizer.h"
 #include "Aql/OptimizerRule.h"
 #include "Aql/Parser.h"
+#include "Aql/QueryContext.h"
 #include "Aql/QueryString.h"
+#include "Aql/SharedQueryState.h"
 #include "Aql/StandaloneCalculation.h"
+#include "Basics/FunctionUtils.h"
 #include "Basics/ResourceUsage.h"
 #include "Basics/StaticStrings.h"
 #include "Basics/VelocyPackHelper.h"
-#include "Basics/FunctionUtils.h"
-#include "Inspection/VPack.h"
+#include "Containers/HashSet.h"
 #include "IResearch/IResearchCommon.h"
 #include "IResearch/VelocyPackHelper.h"
+#include "Inspection/VPack.h"
 #include "Logger/LogMacros.h"
 #include "RestServer/DatabaseFeature.h"
 #include "Transaction/Hints.h"
@@ -51,7 +55,8 @@
 #include "VocBase/Identifiers/DataSourceId.h"
 #include "VocBase/vocbase.h"
 
-#include <Containers/HashSet.h>
+#include "utils/hash_utils.hpp"
+#include "utils/object_pool.hpp"
 
 #include <absl/strings/str_cat.h>
 
@@ -324,7 +329,8 @@ AqlAnalyzer::AqlAnalyzer(Options const& options)
           arangodb::DatabaseFeature::getCalculationVocbase(),
           transaction::OperationOriginInternal{"AQL analyzer"})),
       _itemBlockManager(_query->resourceMonitor()),
-      _engine(0, *_query, _itemBlockManager, nullptr),
+      _engine(0, *_query, _itemBlockManager,
+              std::make_shared<SharedQueryState>(_query->vocbase().server())),
       _resetImpl(&resetFromQuery) {
   _query->resourceMonitor().memoryLimit(_options.memoryLimit);
   std::get<AnalyzerValueTypeAttribute>(_attrs).value = _options.returnType;
@@ -350,7 +356,7 @@ bool AqlAnalyzer::next() {
                 std::get<2>(_attrs).value =
                     arangodb::iresearch::getBytesRef(value.slice());
               } else {
-                VPackFunctionParameters params;
+                functions::VPackFunctionParameters params;
                 params.push_back(value);
                 aql::NoVarExpressionContext ctx(_query->trxForOptimization(),
                                                 *_query,
@@ -366,7 +372,7 @@ bool AqlAnalyzer::next() {
               if (value.isNumber()) {
                 std::get<3>(_attrs).value = value.slice();
               } else {
-                VPackFunctionParameters params;
+                functions::VPackFunctionParameters params;
                 params.push_back(value);
                 aql::NoVarExpressionContext ctx(_query->trxForOptimization(),
                                                 *_query,
@@ -381,7 +387,7 @@ bool AqlAnalyzer::next() {
               if (value.isBoolean()) {
                 std::get<3>(_attrs).value = value.slice();
               } else {
-                VPackFunctionParameters params;
+                functions::VPackFunctionParameters params;
                 params.push_back(value);
                 aql::NoVarExpressionContext ctx(_query->trxForOptimization(),
                                                 *_query,
@@ -489,12 +495,15 @@ bool AqlAnalyzer::reset(std::string_view field) noexcept {
       // SubqueryNodes with SubqueryStartNodes and SubqueryEndNodes.
       Optimizer optimizer(_query->resourceMonitor(), 1);
       // disable all rules which are not necessary
+      optimizer.initializeRules(plan.get(), _query->queryOptions());
       optimizer.disableRules(plan.get(), [](OptimizerRule const& rule) -> bool {
         return rule.canBeDisabled() || rule.isClusterOnly();
       });
       optimizer.createPlans(std::move(plan), _query->queryOptions(), false);
 
       _plan = optimizer.stealBest();
+      TRI_ASSERT(
+          !_plan->hasAppliedRule(OptimizerRule::RuleLevel::asyncPrefetchRule));
 
       // try to optimize
       if (tryOptimize(this)) {

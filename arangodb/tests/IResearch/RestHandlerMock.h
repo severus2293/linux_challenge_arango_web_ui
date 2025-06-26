@@ -38,7 +38,7 @@ class VocbaseContext;
 
 struct GeneralRequestMock : public arangodb::GeneralRequest {
   int64_t _contentLength;
-  std::unique_ptr<arangodb::VocbaseContext>
+  std::shared_ptr<arangodb::VocbaseContext>
       _context;  // VocbaseContext required for use with RestVocbaseBaseHandler
   arangodb::velocypack::Builder _payload;  // request body
 
@@ -83,4 +83,5 @@ struct GeneralResponseMock : public arangodb::GeneralResponse {
   virtual ErrorCode zlibDeflate(bool onlyIfSmaller) override;
   virtual ErrorCode gzipCompress(bool onlyIfSmaller) override;
   virtual ErrorCode lz4Compress(bool onlyIfSmaller) override;
+  void clearBody() noexcept override { _payload.clear(); }
 };

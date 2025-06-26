@@ -23,12 +23,13 @@
 
 #pragma once
 
-#include "Basics/Common.h"
 #include "Basics/Result.h"
 
 #include <velocypack/Builder.h>
 
+#include <cstddef>
 #include <memory>
+#include <optional>
 #include <unordered_set>
 #include <vector>
 
@@ -46,18 +47,26 @@ struct QueryResult {
   QueryResult(QueryResult&& other) = default;
   QueryResult& operator=(QueryResult&& other) = default;
 
-  QueryResult() : cached(false), allowDirtyReads(false) {}
+  QueryResult()
+      : planCacheKey(std::nullopt), cached(false), allowDirtyReads(false) {}
 
   explicit QueryResult(Result const& res)
-      : result(res), cached(false), allowDirtyReads(false) {}
+      : result(res),
+        planCacheKey(std::nullopt),
+        cached(false),
+        allowDirtyReads(false) {}
 
   explicit QueryResult(Result&& res)
-      : result(std::move(res)), cached(false), allowDirtyReads(false) {}
+      : result(std::move(res)),
+        planCacheKey(std::nullopt),
+        cached(false),
+        allowDirtyReads(false) {}
 
   virtual ~QueryResult() = default;
 
   void reset(Result const& res) {
     result.reset(res);
+    planCacheKey.reset();
     cached = false;
     data.reset();
     extra.reset();
@@ -66,6 +75,7 @@ struct QueryResult {
 
   void reset(Result&& res) {
     result.reset(std::move(res));
+    planCacheKey.reset();
     cached = false;
     data.reset();
     extra.reset();
@@ -76,10 +86,8 @@ struct QueryResult {
   bool ok() const { return result.ok(); }
   bool fail() const { return result.fail(); }
   ErrorCode errorNumber() const { return result.errorNumber(); }
-  bool is(ErrorCode errorNumber) const {
-    return result.errorNumber() == errorNumber;
-  }
-  bool isNot(ErrorCode errorNumber) const { return !is(errorNumber); }
+  bool is(ErrorCode errorNumber) const { return result.is(errorNumber); }
+  bool isNot(ErrorCode errorNumber) const { return result.isNot(errorNumber); }
   std::string_view errorMessage() const { return result.errorMessage(); }
 
   uint64_t memoryUsage() const noexcept {
@@ -105,8 +113,8 @@ struct QueryResult {
     return value;
   }
 
- public:
   Result result;
+  std::optional<size_t> planCacheKey;
   bool cached;
   bool allowDirtyReads;  // indicate that query was done with dirty reads,
                          // we need to preserve this here, since query results

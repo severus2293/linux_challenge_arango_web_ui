@@ -23,7 +23,6 @@
 
 #pragma once
 
-#include "Basics/Common.h"
 #include "Basics/ResultT.h"
 #include "Futures/Unit.h"
 #include "GeneralServer/RequestLane.h"
@@ -103,11 +102,7 @@ class RestHandler : public std::enable_shared_from_this<RestHandler> {
   void setIsAsyncRequest() noexcept { _isAsyncRequest = true; }
 
   /// Execute the rest handler state machine
-  void runHandler(std::function<void(rest::RestHandler*)> cb) {
-    TRI_ASSERT(_state == HandlerState::PREPARE);
-    _callback = std::move(cb);
-    runHandlerStateMachine();
-  }
+  void runHandler(std::function<void(rest::RestHandler*)> responseCallback);
 
   /// Execute the rest handler state machine. Retry the wakeup,
   /// returns true if _state == PAUSED, false otherwise
@@ -128,7 +123,8 @@ class RestHandler : public std::enable_shared_from_this<RestHandler> {
   RequestLane determineRequestLane();
 
   virtual void prepareExecute(bool isContinue);
-  virtual RestStatus execute() = 0;
+  virtual RestStatus execute();
+  virtual futures::Future<futures::Unit> executeAsync();
   virtual RestStatus continueExecute() { return RestStatus::DONE; }
   virtual void shutdownExecute(bool isFinalized) noexcept;
 
@@ -205,11 +201,11 @@ class RestHandler : public std::enable_shared_from_this<RestHandler> {
   RequestStatistics::Item _statistics;
 
  private:
-  mutable std::recursive_mutex _executionMutex;
+  mutable std::mutex _executionMutex;
   mutable std::atomic_uint8_t _executionCounter{0};
   mutable RestStatus _followupRestStatus;
 
-  std::function<void(rest::RestHandler*)> _callback;
+  std::function<void(rest::RestHandler*)> _sendResponseCallback;
 
   uint64_t _handlerId;
 

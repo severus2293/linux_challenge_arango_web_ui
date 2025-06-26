@@ -23,11 +23,11 @@
 
 #pragma once
 
+#include "Aql/AsyncPrefetchSlotsManager.h"
 #include "Aql/ExecutionState.h"
 #include "Aql/SharedAqlItemBlockPtr.h"
 #include "Aql/types.h"
 #include "Aql/WalkerWorker.h"
-#include "Basics/Common.h"
 #include "Basics/Result.h"
 #include "Cluster/CallbackGuard.h"
 #include "Containers/SmallVector.h"
@@ -42,6 +42,7 @@ namespace arangodb::aql {
 class AqlCallStack;
 class AqlItemBlock;
 class AqlItemBlockManager;
+class BindParameters;
 class ExecutionBlock;
 class ExecutionNode;
 class ExecutionPlan;
@@ -61,10 +62,14 @@ class ExecutionEngine {
   /// @brief create the engine
   ExecutionEngine(EngineId eId, QueryContext& query,
                   AqlItemBlockManager& itemBlockManager,
-                  std::shared_ptr<SharedQueryState> sharedState = nullptr);
+                  std::shared_ptr<SharedQueryState> sharedState);
 
   /// @brief destroy the engine, frees all assigned blocks
   TEST_VIRTUAL ~ExecutionEngine();
+
+  void leaseAsyncPrefetchSlots(size_t value);
+
+  size_t asyncPrefetchSlotsLeased() const noexcept;
 
   // @brief create an execution engine from a plan
   static void instantiateFromPlan(Query& query, ExecutionPlan& plan,
@@ -148,6 +153,7 @@ class ExecutionEngine {
   void setupEngineRoot(ExecutionBlock& planRoot);
 
   static void initializeConstValueBlock(ExecutionPlan& plan,
+                                        BindParameters const& bindParameters,
                                         AqlItemBlockManager& mgr);
 
   EngineId const _engineId;
@@ -174,6 +180,10 @@ class ExecutionEngine {
 
   /// @brief whether or not initializeCursor was called
   bool _initializeCursorCalled;
+
+  AsyncPrefetchSlotsManager& _asyncPrefetchSlotsManager;
+
+  AsyncPrefetchSlotsReservation _asyncPrefetchSlotsReservation;
 };
 
 }  // namespace arangodb::aql

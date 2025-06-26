@@ -28,6 +28,7 @@
 #include "Aql/AstNode.h"
 #include "Aql/Function.h"
 #include "Aql/SortCondition.h"
+#include "Basics/StaticStrings.h"
 #include "Basics/VelocyPackHelper.h"
 #include "GeoIndex/Covering.h"
 #include "GeoIndex/Near.h"
@@ -545,7 +546,10 @@ class RDBCoveringIterator final : public IndexIterator {
         limit);
   }
 
-  void resetImpl() final { _covering.reset(); }
+  void resetImpl() final {
+    _covering.reset();
+    _gotIntervals = false;
+  }
 
  private:
   void performScan() {

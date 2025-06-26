@@ -23,6 +23,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "RocksDBEngine.h"
+#include "Agency/AgencyFeature.h"
 #include "ApplicationFeatures/ApplicationServer.h"
 #include "ApplicationFeatures/LanguageFeature.h"
 #include "Basics/Exceptions.h"
@@ -68,6 +69,7 @@
 #include "RestServer/FlushFeature.h"
 #include "RestServer/DumpLimitsFeature.h"
 #include "RestServer/LanguageCheckFeature.h"
+#include "RestServer/VectorIndexFeature.h"
 #include "RestServer/ServerIdFeature.h"
 #include "Replication2/Storage/LogStorageMethods.h"
 #include "Replication2/Storage/RocksDB/AsyncLogWriteBatcher.h"
@@ -337,8 +339,12 @@ RocksDBEngine::RocksDBEngine(Server& server,
       _metricsEdgeCacheCompressedInserts(
           metrics.add(rocksdb_cache_edge_compressed_inserts_total{})),
       _metricsEdgeCacheEmptyInserts(
-          metrics.add(rocksdb_cache_edge_empty_inserts_total{})) {
+          metrics.add(rocksdb_cache_edge_empty_inserts_total{})),
+      _forceLegacySortingMethod(false),
+      _sortingMethod(
+          arangodb::basics::VelocyPackHelper::SortingMethod::Correct) {
   startsAfter<BasicFeaturePhaseServer>();
+  startsAfter<VectorIndexFeature>();
   // inherits order from StorageEngine but requires "RocksDBOption" that is
   // used to configure this engine
   startsAfter<RocksDBOptionFeature>();
@@ -498,9 +504,7 @@ RAM than this threshold value are aborted automatically with error 32
           "The interval for automatic, non-requested disk syncs (in "
           "milliseconds, 0 = turn automatic syncing off)",
           new UInt64Parameter(&_syncInterval),
-          arangodb::options::makeFlags(arangodb::options::Flags::OsLinux,
-                                       arangodb::options::Flags::OsMac,
-                                       arangodb::options::Flags::OnDBServer,
+          arangodb::options::makeFlags(arangodb::options::Flags::OnDBServer,
                                        arangodb::options::Flags::OnSingle))
       .setLongDescription(R"(Automatic synchronization of data from RocksDB's
 write-ahead logs to disk is only performed for not-yet synchronized data, and
@@ -767,6 +771,20 @@ when disk size is very constrained and no replication is used.)");
               arangodb::options::Flags::OnSingle))
       .setIntroducedIn(31005);
 
+  options
+      ->addOption(
+          "--rocksdb.force-legacy-comparator",
+          "If set to `true`, forces a new database directory to use the "
+          "legacy sorting method. This is only for testing. Don't use.",
+          new BooleanParameter(&_forceLegacySortingMethod),
+          arangodb::options::makeFlags(
+              arangodb::options::Flags::DefaultNoComponents,
+              arangodb::options::Flags::OnDBServer,
+              arangodb::options::Flags::OnSingle,
+              arangodb::options::Flags::OnAgent,
+              arangodb::options::Flags::Uncommon))
+      .setIntroducedIn(31202);
+
 #ifdef ARANGODB_ENABLE_MAINTAINER_MODE
   options
       ->addOption(
@@ -864,13 +882,16 @@ void RocksDBEngine::prepare() {
 void RocksDBEngine::verifySstFiles(rocksdb::Options const& options) const {
   TRI_ASSERT(!_path.empty());
 
+  LOG_TOPIC("e210d", INFO, arangodb::Logger::STARTUP)
+      << "verifying RocksDB .sst files in path '" << _path << "'";
+
   rocksdb::SstFileReader sstReader(options);
   for (auto const& fileName : TRI_FullTreeDirectory(_path.c_str())) {
     if (!fileName.ends_with(".sst")) {
       continue;
     }
     std::string filename = basics::FileUtils::buildFilename(_path, fileName);
-    rocksdb::Status res = sstReader.Open(fileName);
+    rocksdb::Status res = sstReader.Open(filename);
     if (res.ok()) {
       res = sstReader.VerifyChecksum();
     }
@@ -882,7 +903,19 @@ void RocksDBEngine::verifySstFiles(rocksdb::Options const& options) const {
       FATAL_ERROR_EXIT_CODE(TRI_EXIT_SST_FILE_CHECK);
     }
   }
-  exit(EXIT_SUCCESS);
+
+  LOG_TOPIC("02224", INFO, arangodb::Logger::STARTUP)
+      << "verification of RocksDB .sst files in path '" << _path
+      << "' completed successfully";
+  Logger::flush();
+  // exit with status code = 0, without leaking
+  int exitCode = static_cast<int>(TRI_ERROR_NO_ERROR);
+  TRI_EXIT_FUNCTION(exitCode, nullptr);
+  exit(exitCode);
+}
+
+bool RocksDBEngine::isVectorIndexEnabled() const {
+  return server().getFeature<VectorIndexFeature>().isVectorIndexEnabled();
 }
 
 namespace {
@@ -960,6 +993,34 @@ void RocksDBEngine::start() {
           << "': " << systemErrorStr;
       FATAL_ERROR_EXIT();
     }
+    // When we are getting here, the whole engine-rocksdb directory
+    // did not exist when we got here. Therefore, we can use the correct
+    // sorting behaviour in the RocksDBVPackComparator:
+    _sortingMethod =
+        _forceLegacySortingMethod
+            ? arangodb::basics::VelocyPackHelper::SortingMethod::Legacy
+            : arangodb::basics::VelocyPackHelper::SortingMethod::Correct;
+    // Now remember this decision by putting a `SORTING` file in the
+    // database directory:
+    if (writeSortingFile(_sortingMethod).fail()) {
+      FATAL_ERROR_EXIT();
+    }
+  } else {
+    // In this case the engine-rocksdb directory does already exist.
+    // Therefore, we want to recognize the sorting behaviour in the
+    // RocksDBVPackComparator:
+    _sortingMethod = readSortingFile();
+  }
+  // Now fix the actual rocksdb Comparator, if we need to:
+  if (_sortingMethod ==
+      arangodb::basics::VelocyPackHelper::SortingMethod::Legacy) {
+    LOG_TOPIC("12653", WARN, Logger::ENGINES)
+        << "ATTENTION: Using legacy sorting method for VPack indexes. Consider "
+           "running GET /_admin/cluster/vpackSortMigration/check to find out "
+           "if cheap migration is an option.";
+    server().getFeature<RocksDBOptionFeature>().resetVPackComparator(
+        std::make_unique<RocksDBVPackComparator<
+            arangodb::basics::VelocyPackHelper::SortingMethod::Legacy>>());
   }
 
 #ifdef USE_SST_INGESTION
@@ -1096,6 +1157,9 @@ void RocksDBEngine::start() {
   addFamily(RocksDBColumnFamilyManager::Family::ReplicatedLogs);
   addFamily(RocksDBColumnFamilyManager::Family::MdiIndex);
   addFamily(RocksDBColumnFamilyManager::Family::MdiVPackIndex);
+  if (isVectorIndexEnabled()) {
+    addFamily(RocksDBColumnFamilyManager::Family::VectorIndex);
+  }
 
   bool dbExisted = checkExistingDB(cfFamilies);
 
@@ -1164,6 +1228,10 @@ void RocksDBEngine::start() {
                                   cfHandles[8]);
   RocksDBColumnFamilyManager::set(
       RocksDBColumnFamilyManager::Family::MdiVPackIndex, cfHandles[9]);
+  if (isVectorIndexEnabled()) {
+    RocksDBColumnFamilyManager::set(
+        RocksDBColumnFamilyManager::Family::VectorIndex, cfHandles[10]);
+  }
   TRI_ASSERT(RocksDBColumnFamilyManager::get(
                  RocksDBColumnFamilyManager::Family::Definitions)
                  ->GetID() == 0);
@@ -1495,7 +1563,7 @@ void RocksDBEngine::getCollectionInfo(TRI_vocbase_t& vocbase, DataSourceId cid,
                key.string(), &value);
   auto result = rocksutils::convertStatus(res);
 
-  if (result.errorNumber() != TRI_ERROR_NO_ERROR) {
+  if (result.fail()) {
     THROW_ARANGO_EXCEPTION(result);
   }
 
@@ -1858,7 +1926,7 @@ void RocksDBEngine::processTreeRebuilds() {
               Result res =
                   static_cast<RocksDBCollection*>(collection->getPhysical())
                       ->rebuildRevisionTree()
-                      .get();
+                      .waitAndGet();
               if (res.ok()) {
                 ++_metricsTreeRebuildsSuccess;
                 LOG_TOPIC("2f997", INFO, Logger::ENGINES)
@@ -2060,7 +2128,7 @@ Result RocksDBEngine::dropCollection(TRI_vocbase_t& vocbase,
   bool const prefixSameAsStart = true;
   bool const useRangeDelete = rcoll->meta().numberDocuments() >= 32 * 1024;
 
-  auto resLock = rcoll->lockWrite().get();  // technically not necessary
+  auto resLock = rcoll->lockWrite().waitAndGet();  // technically not necessary
   if (resLock != TRI_ERROR_NO_ERROR) {
     return resLock;
   }
@@ -2226,8 +2294,13 @@ Result RocksDBEngine::createView(TRI_vocbase_t& vocbase, DataSourceId id,
   VPackBuilder props;
 
   props.openObject();
-  view.properties(props,
-                  LogicalDataSource::Serialization::PersistenceWithInProgress);
+  auto result = view.properties(
+      props, LogicalDataSource::Serialization::PersistenceWithInProgress);
+  if (result.fail()) {
+    LOG_TOPIC_IF("234ae", WARN, Logger::VIEWS, !result.ok())
+        << "could not serialize view " << id << ": " << result;
+    return result;
+  }
   props.close();
 
   RocksDBValue const value = RocksDBValue::View(props.slice());
@@ -3463,7 +3536,7 @@ void RocksDBEngine::getStatistics(VPackBuilder& builder) const {
   auto addIntAllCf = [&](std::string const& s) {
     int64_t sum = 0;
     std::string v;
-    for (auto cfh : RocksDBColumnFamilyManager::allHandles()) {
+    for (auto const cfh : RocksDBColumnFamilyManager::allHandles()) {
       v.clear();
       if (_db->GetProperty(cfh, s, &v)) {
         int64_t temp = basics::StringUtils::int64(v);
@@ -3662,6 +3735,9 @@ void RocksDBEngine::getStatistics(VPackBuilder& builder) const {
   addCf(RocksDBColumnFamilyManager::Family::MdiIndex);
   addCf(RocksDBColumnFamilyManager::Family::ReplicatedLogs);
   addCf(RocksDBColumnFamilyManager::Family::MdiVPackIndex);
+  if (isVectorIndexEnabled()) {
+    addCf(RocksDBColumnFamilyManager::Family::VectorIndex);
+  }
   builder.close();
 
   if (_throttleListener) {
@@ -3988,6 +4064,16 @@ void RocksDBEngine::waitForCompactionJobsToFinish() {
       LOG_TOPIC("9cbfd", INFO, Logger::ENGINES)
           << "waiting for " << numRunning << " compaction job(s) to finish...";
     }
+    // Maybe a flush can help?
+    if (iterations == 100) {
+      Result res =
+          flushWal(false /* waitForSync */, true /* flushColumnFamilies */);
+      if (res.fail()) {
+        LOG_TOPIC("25161", WARN, Logger::ENGINES)
+            << "Error on flushWal during waitForCompactionJobsToFinish: "
+            << res.errorMessage();
+      }
+    }
     // unfortunately there is not much we can do except waiting for
     // RocksDB's compaction job(s) to finish.
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -4015,7 +4101,7 @@ bool RocksDBEngine::checkExistingDB(
   if (!status.ok()) {
     // check if we have found the database directory or not
     Result res = rocksutils::convertStatus(status);
-    if (res.errorNumber() != TRI_ERROR_ARANGO_IO_ERROR) {
+    if (res.isNot(TRI_ERROR_ARANGO_IO_ERROR)) {
       // not an I/O error. so we better report the error and abort here
       LOG_TOPIC("74b7f", FATAL, arangodb::Logger::STARTUP)
           << "unable to initialize RocksDB engine: " << res.errorMessage();
@@ -4043,13 +4129,16 @@ bool RocksDBEngine::checkExistingDB(
         RocksDBColumnFamilyManager::Family::MdiIndex);
     auto const mdiVPackIndexName = RocksDBColumnFamilyManager::name(
         RocksDBColumnFamilyManager::Family::MdiVPackIndex);
+    auto const vectorVPackIndexName = RocksDBColumnFamilyManager::name(
+        RocksDBColumnFamilyManager::Family::VectorIndex);
 
     for (auto const& it : cfFamilies) {
       auto it2 = std::find(existingColumnFamilies.begin(),
                            existingColumnFamilies.end(), it.name);
       if (it2 == existingColumnFamilies.end()) {
         if (it.name == replicatedLogsName || it.name == mdiIndexName ||
-            it.name == mdiVPackIndexName) {
+            it.name == mdiVPackIndexName ||
+            (isVectorIndexEnabled() && it.name == vectorVPackIndexName)) {
           LOG_TOPIC("293c3", INFO, Logger::STARTUP)
               << "column family " << it.name
               << " is missing and will be created.";
@@ -4147,6 +4236,72 @@ void RocksDBEngine::addCacheMetrics(uint64_t initial, uint64_t effective,
     _metricsEdgeCacheCompressedInserts.count(totalCompressedInserts);
     _metricsEdgeCacheEmptyInserts.count(totalEmptyInserts);
   }
+}
+
+using SortingMethod = arangodb::basics::VelocyPackHelper::SortingMethod;
+
+Result RocksDBEngine::writeSortingFile(SortingMethod sortingMethod) {
+  auto& databasePathFeature = server().getFeature<DatabasePathFeature>();
+  std::string path = databasePathFeature.subdirectoryName(kSortingMethodFile);
+  std::string value =
+      sortingMethod == SortingMethod::Legacy ? "LEGACY" : "CORRECT";
+  try {
+    basics::FileUtils::spit(path, value, true);
+  } catch (std::exception const& ex) {
+    LOG_TOPIC("8ff0f", ERR, Logger::STARTUP)
+        << "unable to write 'SORTING' file '" << path << "': " << ex.what()
+        << ". Please make sure the file/directory is writable for the "
+           "arangod process and user!";
+    return {TRI_ERROR_CANNOT_WRITE_FILE};
+  }
+  return {};
+}
+
+SortingMethod RocksDBEngine::readSortingFile() {
+  SortingMethod sortingMethod = SortingMethod::Legacy;
+  auto& databasePathFeature = server().getFeature<DatabasePathFeature>();
+  std::string path = databasePathFeature.subdirectoryName(kSortingMethodFile);
+  std::string value;
+  try {
+    basics::FileUtils::slurp(path, value);
+    value = arangodb::basics::StringUtils::trim(value);
+    sortingMethod =
+        (value == "LEGACY") ? SortingMethod::Legacy : SortingMethod::Correct;
+  } catch (std::exception const& ex) {
+    // To find out if we are an agent, we need to check if the AgencyFeature
+    // is activated! Note that we cannot use ServerState::isAgent here for
+    // the following reason: When we run an upgraded version for the first
+    // time, we almost certainly run with --database.auto-upgrade=true .
+    // But in this case, the AgencyFeature and the ClusterFeature are
+    // disabled! Therefore, the role of the server is not correctly
+    // reported to the ServerState class!
+    auto& agencyFeature = server().getFeature<AgencyFeature>();
+    // When we see a database directory without SORTING file, we fall back
+    // to legacy mode, except for agents. Since agents have never used
+    // VPackIndexes before we fixed the sorting order, we might as well
+    // directly consider them to be migrated to the CORRECT sorting order:
+    sortingMethod = agencyFeature.activated() ? SortingMethod::Correct
+                                              : SortingMethod::Legacy;
+    LOG_TOPIC("8ff0e", WARN, Logger::STARTUP)
+        << "unable to read 'SORTING' file '" << path << "': " << ex.what()
+        << ". This is expected directly after an upgrade and will then be "
+           "rectified automatically for subsequent restarts.";
+    if (writeSortingFile(sortingMethod).fail()) {
+      LOG_TOPIC("8ff0d", WARN, Logger::STARTUP)
+          << "Unable to write 'SORTING' file '" << _path << "', "
+          << "this is OK for now, legacy sorting will be used anyway.";
+    }
+  }
+  return sortingMethod;
+}
+
+std::string RocksDBEngine::getSortingMethodFile() const {
+  return arangodb::basics::FileUtils::buildFilename(_basePath,
+                                                    kSortingMethodFile);
+}
+
+std::string RocksDBEngine::getLanguageFile() const {
+  return arangodb::basics::FileUtils::buildFilename(_basePath, kLanguageFile);
 }
 
 }  // namespace arangodb

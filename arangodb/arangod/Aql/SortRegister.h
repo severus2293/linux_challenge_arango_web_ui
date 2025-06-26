@@ -24,19 +24,24 @@
 
 #pragma once
 
-#include "Aql/ExecutionNode.h"
 #include "Aql/types.h"
 
 #include <string>
 #include <vector>
 
-namespace arangodb {
-namespace aql {
+namespace arangodb::aql {
+class ExecutionNode;
+class ExecutionPlan;
+template<typename T>
+struct RegisterPlanT;
+using RegisterPlan = RegisterPlanT<ExecutionNode>;
+struct SortElement;
 
 /// @brief sort element for block, consisting of register, sort direction,
 /// and a possible attribute path to dig into the document
 struct SortRegister {
-  SortRegister(SortRegister&) = delete;  // we can not copy the ireseach scorer
+  SortRegister(SortRegister const&) =
+      delete;  // we can not copy the iresearch scorer
   SortRegister(SortRegister&&) = default;
 
   std::vector<std::string> const& attributePath;
@@ -51,5 +56,4 @@ struct SortRegister {
                    std::vector<SortRegister>& sortRegisters);
 };  // SortRegister
 
-}  // namespace aql
-}  // namespace arangodb
+}  // namespace arangodb::aql

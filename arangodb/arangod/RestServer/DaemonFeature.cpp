@@ -44,7 +44,6 @@
 #include "Basics/process-utils.h"
 #include "Basics/system-functions.h"
 #include "Basics/threads.h"
-#include "Logger/LogAppender.h"
 #include "Logger/LogMacros.h"
 #include "Logger/Logger.h"
 #include "Logger/LoggerStream.h"
@@ -83,27 +82,18 @@ void DaemonFeature::collectOptions(std::shared_ptr<ProgramOptions> options) {
       "Start the server as a daemon (background process). Requires --pid-file "
       "to be set.",
       new BooleanParameter(&_daemon),
-      arangodb::options::makeFlags(arangodb::options::Flags::DefaultNoOs,
-                                   arangodb::options::Flags::OsLinux,
-                                   arangodb::options::Flags::OsMac,
-                                   arangodb::options::Flags::Uncommon));
+      arangodb::options::makeFlags(arangodb::options::Flags::Uncommon));
 
   options->addOption(
       "--pid-file",
       "The name of the process ID file to use if the server runs as a daemon.",
       new StringParameter(&_pidFile),
-      arangodb::options::makeFlags(arangodb::options::Flags::DefaultNoOs,
-                                   arangodb::options::Flags::OsLinux,
-                                   arangodb::options::Flags::OsMac,
-                                   arangodb::options::Flags::Uncommon));
+      arangodb::options::makeFlags(arangodb::options::Flags::Uncommon));
 
   options->addOption(
       "--working-directory", "The working directory in daemon mode.",
       new StringParameter(&_workingDirectory),
-      arangodb::options::makeFlags(arangodb::options::Flags::DefaultNoOs,
-                                   arangodb::options::Flags::OsLinux,
-                                   arangodb::options::Flags::OsMac,
-                                   arangodb::options::Flags::Uncommon));
+      arangodb::options::makeFlags(arangodb::options::Flags::Uncommon));
 }
 
 void DaemonFeature::validateOptions(
@@ -279,7 +269,7 @@ int DaemonFeature::forkProcess() {
   TRI_ASSERT(pid == 0);  // we are in the child
 
   // child
-  LogAppender::allowStdLogging(false);
+  Logger::allowStdLogging(false);
   Logger::clearCachedPid();
 
   // change the file mode mask

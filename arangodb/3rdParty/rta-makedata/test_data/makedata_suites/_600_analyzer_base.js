@@ -1,4 +1,4 @@
-/* global print, semver, progress, createSafe, createCollectionSafe, db, analyzers, _ */
+/* global print, semver, progress, createSafe, createCollectionSafe, db, analyzers, _, arango */
 /*jslint maxlen: 100*/
 
 const analyzers = require("@arangodb/analyzers");
@@ -57,25 +57,43 @@ function arraysEqual(analyzer_name, a, b) {
   }
 }
 
+function dumpAnalyzerCollection() {
+  print(`${Date()} Dumping analyzers`);
+  print("--------------------------------------------------------------------------------");
+  print(JSON.stringify(db._analyzers.toArray()));
+  print("--------------------------------------------------------------------------------");
+  print(`${Date()} DONE`);
+}
+
 // this function will check everything regarding given analyzer
 function checkAnalyzerSet(testgroup, test){
   progress(`${testgroup}: ${test.analyzerName} running query ${test.query}`);
-  let queryResult = db._query(test);
+  let queryResult;
+  try {
+    queryResult = db._query(test);
+  }
+  catch (ex) {
+    dumpAnalyzerCollection();
+    throw ex;
+  }
 
   if (analyzers.analyzer(test.analyzerName) === null) {
+    dumpAnalyzerCollection();
     throw new Error(`${testgroup}: ${test.analyzerName} analyzer creation failed!`);
   }
 
   progress(`${testgroup}: ${test.analyzerName} checking analyzer's name`);
   let testName = analyzers.analyzer(test.analyzerName).name();
-  let expectedName = `_system::${test.analyzerName}`;
+  let expectedName = `${arango.getDatabaseName()}::${test.analyzerName}`;
   if (testName !== expectedName) {
+    dumpAnalyzerCollection();
     throw new Error(`${testgroup}: ${test.analyzerName} analyzer not found`);
   }
 
   progress(`${testgroup}: ${test.analyzerName} checking analyzer's type`);
   let testType = analyzers.analyzer(test.analyzerName).type();
   if (testType !== test.analyzerType){
+    dumpAnalyzerCollection();
     throw new Error(`${testgroup}: ${test.analyzerName} analyzer type missmatched! ${testType} != ${test.analyzerType}`);
   }
 
@@ -94,34 +112,34 @@ function checkAnalyzerSet(testgroup, test){
 function deleteAnalyzer(testgroup, analyzerName){
   const array = analyzers.toArray();
   for (let i = 0; i < array.length; i++) {
-    const name = array[i].name().replace('_system::', '');
+    const name = array[i].name().replace(`${arango.getDatabaseName()}::`, '');
     if (name === analyzerName) {
       analyzers.remove(analyzerName);
     }
   }
   // checking created text analyzer is deleted or not
   if (analyzers.analyzer(analyzerName) != null) {
-    throw new Error(`${testgroup}: ${analyzerName} analyzer isn't deleted yet!`);
+    throw new Error(`${testgroup}: ${analyzerName} analyzer isn't deleted yet: ${analyzers.toArray()}`);
   }
   progress(`${testgroup}: deleted ${analyzerName}`);
 }
 
 function deleteAnalyzerSet(testgroup, test) {
   if (test.hasOwnProperty('collection')) {
-    progress(`${testgroup}: deleting view ${test.bindVars['@testView']} `);
+    print(`${testgroup}: deleting view ${test.bindVars['@testView']} `);
     try {
       db._dropView(test.bindVars['@testView']);
     } catch (ex) {
-      print(ex);
+      print(`${Date()} 600: ${ex} ${ex.stack}`);
     }
-    progress(`${testgroup}: deleting collection ${test.collection} `);
+    print(`${testgroup}: deleting collection ${test.collection} `);
     try {
       db._drop(test.collection);
     } catch (ex) {
-      print(ex);
+      print(`${Date()} 600: ${ex} ${ex.stack}`);
     }
   }
-  progress(`${testgroup}: deleting Analyzer ${test.analyzerName}`);
+  print(`${Date()} 600: ${testgroup}: deleting Analyzer ${test.analyzerName}`);
   deleteAnalyzer(testgroup, test.analyzerName);
 }
 

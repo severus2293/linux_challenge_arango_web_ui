@@ -22,7 +22,6 @@
 /// @author Copyright 2015, ArangoDB GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "Basics/Common.h"
 #include "Basics/FileUtils.h"
 #include "Basics/files.h"
 #include "Basics/ScopeGuard.h"
@@ -31,6 +30,7 @@
 #include "gtest/gtest.h"
 
 #include "Logger/LogAppenderFile.h"
+#include "Logger/LogMessage.h"
 #include "Logger/Logger.h"
 #include "fmt/format.h"
 

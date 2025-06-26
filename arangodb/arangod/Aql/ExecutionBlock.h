@@ -31,14 +31,22 @@
 
 #include <atomic>
 #include <cstdint>
-#include <string_view>
+#include <unordered_set>
 #include <utility>
+#include <string_view>
 #include <vector>
 
 namespace arangodb {
 namespace transaction {
 class Methods;
 }
+
+namespace futures {
+template<typename T>
+class Future;
+
+struct Unit;
+}  // namespace futures
 
 namespace aql {
 class AqlCallStack;
@@ -124,6 +132,16 @@ class ExecutionBlock {
 
   [[nodiscard]] auto printBlockInfo() const -> std::string const;
   [[nodiscard]] auto printTypeInfo() const -> std::string const;
+  [[nodiscard]] auto printBlockAndDependenciesInfo() const noexcept
+      -> std::string const;
+
+  virtual auto stopAsyncTasks() -> void;
+
+  [[nodiscard]] auto isDependencyInList(
+      std::unordered_set<ExecutionBlock*> const& seenBlocks) const noexcept
+      -> ExecutionBlock*;
+
+  [[nodiscard]] auto hasStoppedAsyncTasks() const noexcept -> bool;
 
  protected:
   // Trace the start of a execute call
@@ -142,6 +160,9 @@ class ExecutionBlock {
   ///        used to determine HASMORE or DONE better
   ExecutionState _upstreamState;
 
+  /// @brief profiling level
+  ProfileLevel _profileLevel;
+
   /// @brief our corresponding ExecutionNode node
   ExecutionNode const* _exeNode;
 
@@ -155,9 +176,6 @@ class ExecutionBlock {
 
   ExecutionNodeStats _execNodeStats;
 
-  /// @brief profiling level
-  ProfileLevel _profileLevel;
-
   /// @brief start time of execution of block. initially -1.0 (used only
   /// in assertions). will be reset to -1.0 will be set to current time
   /// in traceExecuteBegin() and be reset to -1.0 in traceExecuteEnd.
@@ -167,12 +185,23 @@ class ExecutionBlock {
   /// @brief if this is set, we are done, this is reset to false by execute()
   bool _done;
 
+  /// @brief if this is set, we have stopped async tasks, this is set to true by
+  /// stopAsyncTasks()
+  bool _stoppedAsyncTasks{false};
+
 #ifdef ARANGODB_ENABLE_MAINTAINER_MODE
   /// @brief if this is set to true, one thread is using this block, so we can
   /// assert that no other thread can access this block at the same time - as
   /// this would harm our implementation.
   std::atomic<bool> _isBlockInUse{false};
 #endif
+
+  /// @brief The following is always 0 or 1, if our assumptions are correct.
+  /// The `execute` method as well as the destructor increment it at their
+  /// start and decrement it at their end. If we detect a double use, we
+  /// log the stack traces.
+  std::atomic<uint64_t> _numberOfUsers{0};
+  std::atomic<bool> _logStacktrace{false};
 };
 
 }  // namespace aql

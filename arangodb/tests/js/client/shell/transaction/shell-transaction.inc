@@ -43,7 +43,7 @@ const deriveTestSuite = require('@arangodb/test-helper').deriveTestSuite;
 const analyzers = require('@arangodb/analyzers');
 const ArangoTransaction = require('@arangodb/arango-transaction').ArangoTransaction;
 const isCluster = internal.isCluster();
-const isReplication2Enabled = require('internal').db._version(true).details['replication2-enabled'] === 'true';
+const isReplication2Enabled = internal.db._version(true).details['replication2-enabled'] === 'true';
 
 const compareStringIds = function (l, r) {
   'use strict';
@@ -4494,9 +4494,7 @@ function transactionTTLStreamSuite (dbParams) {
     // //////////////////////////////////////////////////////////////////////////////
 
     testAbortIdleTrx: function () {
-      try {
-        internal.debugSetFailAt("lowStreamingIdleTimeout");
-      } catch (err) {}
+      global.instanceManager.debugSetFailAt("lowStreamingIdleTimeout");
 
       try {
         let trx = db._createTransaction({
@@ -4519,7 +4517,7 @@ function transactionTTLStreamSuite (dbParams) {
         }
       } finally {
         try {
-          internal.debugRemoveFailAt("lowStreamingIdleTimeout");
+          global.instanceManager.debugRemoveFailAt("lowStreamingIdleTimeout");
         } catch (err) {}
       }
     }
@@ -4559,7 +4557,7 @@ function transactionIteratorSuite(dbParams) {
     testIteratorBoundsForward: function () {
       c.ensureIndex({ type: "persistent", fields: ["value1"] });
       c.ensureIndex({ type: "persistent", fields: ["value2"] });
-      let res = c.getIndexes();
+      let res = c.indexes();
       assertEqual(3, res.length);
 
       const opts = {
@@ -4601,7 +4599,7 @@ function transactionIteratorSuite(dbParams) {
     testIteratorBoundsReverse: function () {
       c.ensureIndex({ type: "persistent", fields: ["value1"] });
       c.ensureIndex({ type: "persistent", fields: ["value2"] });
-      let res = c.getIndexes();
+      let res = c.indexes();
       assertEqual(3, res.length);
 
       const opts = {
@@ -5717,6 +5715,22 @@ function transactionDatabaseSuite() {
       } finally {
         db._useDatabase(dbn1);
         trx1.abort();
+      }
+    },
+
+    testTransactionsAreDatabaseLocal: function() {
+      db._useDatabase(dbn1);
+      const opts = { collections: { write: [cn] } };
+      const trx = db._createTransaction(opts);
+      trx.collection(cn).insert({ _key: "test" });
+      try {
+        db._useDatabase(dbn2);
+        trx.collection(cn).document("test");
+        fail();
+      } catch(err) {
+        assertEqual(internal.errors.ERROR_TRANSACTION_NOT_FOUND.code, err.errorNum);
+      } finally {
+        db._useDatabase(dbn1);
       }
     },
   };

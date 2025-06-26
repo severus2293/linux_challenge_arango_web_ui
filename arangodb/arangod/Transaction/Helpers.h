@@ -24,7 +24,6 @@
 #pragma once
 
 #include <string_view>
-#include "Basics/Common.h"
 #include "Transaction/CountCache.h"
 #include "Utils/OperationResult.h"
 #include "VocBase/Identifiers/DataSourceId.h"
@@ -189,6 +188,8 @@ class BuilderLeaser {
   velocypack::Builder& operator*() const noexcept { return *_builder; }
   velocypack::Builder* get() const noexcept { return _builder; }
   velocypack::Builder* steal() { return std::exchange(_builder, nullptr); }
+
+  void clear();
 
  private:
   Context* _transactionContext;

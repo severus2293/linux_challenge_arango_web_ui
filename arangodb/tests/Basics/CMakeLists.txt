@@ -11,6 +11,7 @@ target_sources(arangodbtests
   InputProcessorsTest.cpp
   OverloadTest.cpp
   SizeLimitedStringTest.cpp
+  SourceLocationTest.cpp
   StringBufferTest.cpp
   StringBufferInternalTest.cpp
   StringTest.cpp
@@ -33,5 +34,7 @@ target_sources(arangodbtests
   SpinLockTest.cpp
   StringBufferTest.cpp
   StringUtilsTest.cpp
+  TypeListTests.cpp
   UnshackledMutexTest.cpp
-  VelocyPackHelperTest.cpp)
+  VelocyPackHelperTest.cpp
+  VelocyPackHelperCompareRandomTest.cpp)

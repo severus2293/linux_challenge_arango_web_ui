@@ -28,6 +28,7 @@
 #include <string>
 #include <string_view>
 
+#include "Basics/threads-posix.h"
 #include "Basics/threads.h"
 #include "Basics/DownCast.h"
 
@@ -42,6 +43,7 @@ struct ConditionVariable;
 class ThreadNameFetcher {
  public:
   ThreadNameFetcher() noexcept;
+  ThreadNameFetcher(TRI_tid_t id) noexcept;
   ThreadNameFetcher(ThreadNameFetcher const&) = delete;
   ThreadNameFetcher& operator=(ThreadNameFetcher const&) = delete;
 
@@ -93,9 +95,14 @@ class Thread {
   /// @brief returns the thread id
   static TRI_tid_t currentThreadId();
 
+  /// @brief returns the kernel thread id
+  static TRI_pid_t currentKernelThreadId();
+
  public:
-  Thread(application_features::ApplicationServer& server,
-         std::string const& name, bool deleteOnExit = false,
+  [[deprecated("server argument is no longer needed")]] Thread(
+      application_features::ApplicationServer&, std::string const& name,
+      bool deleteOnExit = false, std::uint32_t terminationTimeout = INFINITE);
+  Thread(std::string const& name, bool deleteOnExit = false,
          std::uint32_t terminationTimeout = INFINITE);
   virtual ~Thread();
 
@@ -104,9 +111,6 @@ class Thread {
 
   /// @brief whether or not the thread is chatty on shutdown
   virtual bool isSilent() const { return false; }
-
-  /// @brief the underlying application server
-  application_features::ApplicationServer& server() noexcept { return _server; }
 
   /// @brief flags the thread as stopping
   /// Classes that override this function must ensure that they
@@ -132,7 +136,10 @@ class Thread {
 
   /// @brief true, if the thread is still running
   bool isRunning() const noexcept {
-    return _state.load(std::memory_order_relaxed) != ThreadState::STOPPED;
+    // need acquire to ensure we establish a happens before relation with the
+    // update that sets the state to STOPPED, so threads that wait for isRunning
+    // to return false are properly synchronized
+    return _state.load(std::memory_order_acquire) != ThreadState::STOPPED;
   }
 
   /// @brief checks if the current thread was asked to stop
@@ -172,9 +179,6 @@ class Thread {
   void runMe();
   void releaseRef() noexcept;
 
- protected:
-  application_features::ApplicationServer& _server;
-
  private:
   std::atomic<bool> _threadStructInitialized;
   std::atomic<int> _refs;
@@ -207,11 +211,13 @@ class ServerThread : public Thread {
   ServerThread(Server& server, std::string const& name,
                bool deleteOnExit = false,
                std::uint32_t terminationTimeout = INFINITE)
-      : Thread{server, name, deleteOnExit, terminationTimeout} {}
+      : Thread{server, name, deleteOnExit, terminationTimeout},
+        _server(server) {}
 
-  Server& server() noexcept {
-    return basics::downCast<Server>(Thread::server());
-  }
+  Server& server() noexcept { return _server; }
+
+ protected:
+  Server& _server;
 };
 
 }  // namespace arangodb

@@ -4,6 +4,12 @@
 
 add_compile_warnings_flags()
 
+if (USE_GOOGLE_TESTS)
+  add_definitions("-DTEST_VIRTUAL=virtual")
+else()
+  add_definitions("-DTEST_VIRTUAL=")
+endif()
+
 # add necessary defines for ICU. this will suffix all included ICU functions
 # and the ICU namespace with _64_64
 add_definitions("-DU_HAVE_LIB_SUFFIX=1")
@@ -49,9 +55,7 @@ add_dependencies(${BIN_ARANGOD} iculegacy_build)
 if (USE_JEMALLOC)
   add_dependencies(${BIN_ARANGOD} jemalloc_build)
 endif ()
-if (UNIX) 
-  add_dependencies(${BIN_ARANGOD} man)
-endif ()
+add_dependencies(${BIN_ARANGOD} man)
 
 target_include_directories(${BIN_ARANGOD} PRIVATE
   "${PROJECT_SOURCE_DIR}/arangod"
@@ -93,6 +97,7 @@ get_target_property(IRESEARCH_INCLUDE
 include(arangoserver.cmake)
 add_subdirectory(Agency)
 add_subdirectory(Aql)
+add_subdirectory(AsyncRegistryServer)
 add_subdirectory(Cache)
 add_subdirectory(Cluster)
 add_subdirectory(ClusterEngine)
@@ -113,3 +118,4 @@ if (USE_V8)
 endif()
 add_subdirectory(VocBase)
 add_subdirectory(Zkd)
+add_subdirectory(Scheduler)

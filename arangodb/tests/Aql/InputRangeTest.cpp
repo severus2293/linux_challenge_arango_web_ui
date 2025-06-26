@@ -21,13 +21,13 @@
 /// @author Michael Hackstein
 ////////////////////////////////////////////////////////////////////////////////
 
+#include "Aql/Executor/AqlExecutorTestCase.h"
 #include "gtest/gtest.h"
-
-#include "AqlExecutorTestCase.h"
 
 #include "Aql/AqlItemBlockInputRange.h"
 #include "Aql/ExecutionState.h"
 #include "Aql/MultiAqlItemBlockInputRange.h"
+#include "Aql/ShadowAqlItemRow.h"
 
 #if GTEST_HAS_TYPED_TEST_P
 

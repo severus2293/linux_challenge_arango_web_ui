@@ -22,8 +22,6 @@
 /// @author Copyright 2015, ArangoDB GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "Basics/Common.h"
-
 #include "gtest/gtest.h"
 
 #include "Basics/Exceptions.h"
@@ -570,7 +568,8 @@ TEST_F(RocksDBKeyBoundsTestLittleEndian, test_hash_index) {
   EXPECT_EQ(prefixEnd.data()[prefixEnd.size() - 1], '\0');
 
   // prefix is just object id
-  auto cmp = std::make_unique<RocksDBVPackComparator>();
+  auto cmp = std::make_unique<RocksDBVPackComparator<
+      arangodb::basics::VelocyPackHelper::SortingMethod::Correct>>();
   EXPECT_EQ(cmp->Compare(prefixBegin, prefixEnd), 0);
   EXPECT_LT(cmp->Compare(prefixBegin, key1.string()), 0);
   EXPECT_GT(cmp->Compare(bounds.end(), key1.string()), 0);
@@ -720,7 +719,8 @@ TEST_F(RocksDBKeyBoundsTestBigEndian, test_hash_index) {
   EXPECT_EQ(prefixEnd.data()[prefixEnd.size() - 1], '\x02');
 
   // prefix is just object id
-  auto cmp = std::make_unique<RocksDBVPackComparator>();
+  auto cmp = std::make_unique<RocksDBVPackComparator<
+      arangodb::basics::VelocyPackHelper::SortingMethod::Correct>>();
   EXPECT_LT(cmp->Compare(prefixBegin, prefixEnd), 0);
   EXPECT_LT(cmp->Compare(prefixBegin, key1.string()), 0);
   EXPECT_GT(cmp->Compare(prefixEnd, key1.string()), 0);

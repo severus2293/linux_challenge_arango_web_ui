@@ -46,6 +46,7 @@ const edgeColName = profHelper.edgeColName;
 const viewName = profHelper.viewName;
 const defaultBatchSize = profHelper.defaultBatchSize;
 const deriveTestSuite = require('@arangodb/test-helper').deriveTestSuite;
+let IM = global.instanceManager;
 
 const {
  AsyncNode, CalculationNode, CollectNode, DistributeNode, EnumerateCollectionNode,
@@ -74,6 +75,7 @@ function ahuacatlProfilerTestSuite() {
     },
 
     testMaterializeBlock: function () {
+      IM.debugSetFailAt('batch-materialize-no-estimation');
       const col = db._create(colName);
       col.insert({ name_1: "foo", "value_nested": [{ "nested_1": [{ "nested_2": "foo123"}]}]});
       let indexMeta = {};
@@ -98,6 +100,9 @@ function ahuacatlProfilerTestSuite() {
         col.insert(_.range(1, rows + 1).map((i) => ({value: i})));
       };
       const query = `FOR d IN @@col FILTER d.value <= 10 SORT d.more LIMIT 3 RETURN d`;    
+      // we intentionally disable the constrained heap sort in this test, so
+      // we always have a regular sort block
+      const options = {optimizer: {rules: ["-sort-limit"]}};
 
       const genNodeList = (rows, batches) => {
         return [
@@ -110,7 +115,7 @@ function ahuacatlProfilerTestSuite() {
         ];
       };
       profHelper.runDefaultChecks(
-        {query, genNodeList, prepare, bind}
+        {query, genNodeList, prepare, bind, options}
       );
 
       // collection was truncated. Insert them again
@@ -119,15 +124,17 @@ function ahuacatlProfilerTestSuite() {
       const iiQuery = `FOR d IN ${colName} OPTIONS {indexHint: 'inverted', forceIndexHint: true, waitForSync: true} 
          FILTER d.value <= 10 SORT d.more LIMIT 3 RETURN d`;
       let iiQueryRes = db._query(iiQuery).toArray();
-      assertTrue(iiQueryRes.length >= 2); // 2 docs with nested + more from 'prepare' function 
+      assertTrue(iiQueryRes.length >= 2); // 2 docs with nested + more from 'prepare' function
+      IM.debugClearFailAt();
     },
 
     testMaterializeBlockThatFilters: function () {
-      if (!internal.debugCanUseFailAt()) {
+      if (!IM.debugCanUseFailAt()) {
         return;
       }
 
       try {
+        IM.debugSetFailAt('batch-materialize-no-estimation');
         const col = db._create(colName);
         col.insert({name_1: "foo", "value_nested": [{"nested_1": [{"nested_2": "foo123"}]}]});
         let indexMeta = {};
@@ -156,6 +163,9 @@ function ahuacatlProfilerTestSuite() {
           col.insert(_.range(1, rows + 1).map((i) => ({value: i})));
         };
         const query = `FOR d IN @@col FILTER d.value <= 10 SORT d.more LIMIT 3 RETURN d`;
+        // we intentionally disable the constrained heap sort in this test, so
+        // we always have a regular sort block
+        const options = {optimizer: {rules: ["-sort-limit"]}};
 
         const genNodeList = (rows, batches) => {
           return [
@@ -169,7 +179,7 @@ function ahuacatlProfilerTestSuite() {
         };
 
         profHelper.runDefaultChecks(
-          {query, genNodeList, prepare, bind}
+          {query, genNodeList, prepare, bind, options}
         );
 
         // collection was truncated. Insert them again
@@ -182,7 +192,7 @@ function ahuacatlProfilerTestSuite() {
 
       } finally {
         // clear failure points!
-        internal.debugClearFailAt();
+        IM.debugClearFailAt();
       }
     },
 

@@ -16,7 +16,6 @@
     },
     makeData: function (options, isCluster, isEnterprise, dbCount, loopCount) {
       progress(`105: Makedata ${dbCount} ${loopCount}`);
-      db._useDatabase('_system');
       let c_zkd = db[`c_zkd_${dbCount}`];
 
       // Now the actual data writing:
@@ -25,7 +24,7 @@
       progress('105: writeData1');
     },
     checkDataDB: function (options, isCluster, isEnterprise, database, dbCount, readOnly) {
-      print(`checking data ${dbCount}`);
+      print(`${Date()} 105: checking data ${dbCount}`);
       let cols = db._collections();
       let allFound = true;
       [`c_zkd_${dbCount}`].forEach(colname => {
@@ -36,7 +35,7 @@
            }
          });
          if (!foundOne) {
-           print("105: Didn't find this collection: " + colname);
+           print(`${Date()} 105: Didn't find this collection: ${colname}`);
            allFound = false;
          }
        });
@@ -65,7 +64,7 @@
       progress("105: done");
     },
     clearData: function (options, isCluster, isEnterprise, dbCount, loopCount, readOnly) {
-      print(`clearing data ${dbCount} ${loopCount}`);
+      print(`${Date()} 105: clearing data ${dbCount} ${loopCount}`);
       progress("105: drop 1");
       try {
         db._drop(`c_zkd_${dbCount}`);

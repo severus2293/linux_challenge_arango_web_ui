@@ -24,8 +24,6 @@
 
 #pragma once
 
-#include "Basics/Common.h"
-
 #include <rocksdb/slice.h>
 
 #include <string_view>
@@ -63,6 +61,7 @@ enum class RocksDBEntryType : char {
   UniqueMdiIndexValue = 'Z',
   MdiVPackIndexValue = 'w',
   UniqueMdiVPackIndexValue = 'W',
+  VectorVPackIndexValue = 'v',
 };
 
 std::string_view rocksDBEntryTypeName(RocksDBEntryType);

@@ -27,7 +27,9 @@
 #include "ApplicationFeatures/ApplicationServer.h"
 #include "Aql/QueryCache.h"
 #include "Aql/QueryList.h"
+#include "Aql/QueryPlanCache.h"
 #include "Aql/QueryRegistry.h"
+#include "Auth/UserManager.h"
 #include "Basics/ArangoGlobalContext.h"
 #include "Basics/FileUtils.h"
 #include "Basics/NumberUtils.h"
@@ -67,6 +69,7 @@
 #include "V8Server/V8DealerFeature.h"
 #endif
 #include "VocBase/LogicalCollection.h"
+#include "VocBase/VocbaseMetrics.h"
 #include "VocBase/ticks.h"
 #include "VocBase/vocbase.h"
 
@@ -102,7 +105,16 @@ CreateDatabaseInfo createExpressionVocbaseInfo(ArangodServer& server) {
   return info;
 }
 
-/// @brief sandbox vocbase for executing calculation queries
+/// @brief sandbox vocbase for executing calculation queries.
+/// TODO: instead of global variable, this should be an instance variable in the
+/// DatabaseFeature. otherwise it is problematic to create two individual
+/// DatabaseFeature objects with overlapping lifetime, as we do in the unit
+/// tests. by creating multiple DatabaseFeature objects, they may each clobber
+/// the global calculationVocbase object.
+/// the main user of the calculationVocbase is the IResearchAqlAnalyzer.
+/// its constructor should be changed so that instead of referring to global
+/// static methods to access the calculationVocbase, the DatabaseFeature
+/// instance should be passed into it.
 std::unique_ptr<TRI_vocbase_t> calculationVocbase;
 }  // namespace
 
@@ -268,6 +280,7 @@ DatabaseFeature::DatabaseFeature(Server& server)
   startsAfter<EngineSelectorFeature>();
   startsAfter<InitDatabaseFeature>();
   startsAfter<StorageEngineFeature>();
+  startsAfter<metrics::MetricsFeature>();
 }
 
 DatabaseFeature::~DatabaseFeature() = default;
@@ -395,9 +408,9 @@ void DatabaseFeature::validateOptions(
 
 void DatabaseFeature::initCalculationVocbase(ArangodServer& server) {
   auto& df = server.getFeature<DatabaseFeature>();
-  calculationVocbase =
-      std::make_unique<TRI_vocbase_t>(createExpressionVocbaseInfo(server),
-                                      df.versionTracker(), df.extendedNames());
+  calculationVocbase = std::make_unique<TRI_vocbase_t>(
+      createExpressionVocbaseInfo(server), df.versionTracker(),
+      df.extendedNames(), /*isInternal*/ true);
 }
 
 void DatabaseFeature::start() {
@@ -633,7 +646,7 @@ void DatabaseFeature::recoveryDone() {
   // TODO(MBkkt) use single wait with early termination
   // when it would be available
   for (auto& future : futures) {
-    auto result = std::move(future).get();
+    auto result = std::move(future).waitAndGet();
     if (!result.ok()) {
       LOG_TOPIC("772a7", ERR, Logger::FIXME)
           << "recovery failure due to error from callback, error '"
@@ -853,6 +866,7 @@ ErrorCode DatabaseFeature::dropDatabase(std::string_view name) {
     }
 
     // invalidate all entries for the database
+    vocbase->queryPlanCache().invalidateAll();
     aql::QueryCache::instance()->invalidate(vocbase);
 
     if (server().hasFeature<iresearch::IResearchAnalyzerFeature>()) {
@@ -1167,6 +1181,13 @@ ErrorCode DatabaseFeature::iterateDatabases(velocypack::Slice databases) {
   auto prev = _databases.load();
   auto next = _databases.make(prev);
 
+  std::vector<TRI_vocbase_t*> newDatabases;
+  auto databaseGuard = scopeGuard([&newDatabases]() noexcept {
+    for (auto p : newDatabases) {
+      delete p;
+    }
+  });
+
   ServerState::RoleEnum role = ServerState::instance()->getRole();
 
   for (velocypack::Slice it : velocypack::ArrayIterator(databases)) {
@@ -1257,10 +1278,13 @@ ErrorCode DatabaseFeature::iterateDatabases(velocypack::Slice databases) {
         FATAL_ERROR_EXIT();
       }
     }
+    ADB_PROD_ASSERT(!next->contains(database->name()))
+        << "duplicate database name " << database->name();
     next->emplace(database->name(), database.get());
-    std::ignore = database.release();
+    newDatabases.emplace_back(database.release());
   }
 
+  databaseGuard.cancel();
   _databases.store(std::move(next));
   waitUnique(prev);
 

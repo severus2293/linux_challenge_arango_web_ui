@@ -1,5 +1,5 @@
 /* jshint globalstrict:false, strict:false, unused : false */
-/* global assertEqual, assertTrue */
+/* global runSetup assertEqual, assertTrue */
 
 // //////////////////////////////////////////////////////////////////////////////
 // / DISCLAIMER
@@ -25,12 +25,14 @@
 // / @author Copyright 2012, triAGENS GmbH, Cologne, Germany
 // //////////////////////////////////////////////////////////////////////////////
 
-var internal = require('internal');
-var jsunity = require('jsunity');
+const internal = require('internal');
+const jsunity = require('jsunity');
 
-function runSetup () {
+if (runSetup === true) {
   'use strict';
   // intentionall do nothing, so we will see a normal shutdown!
+  global.instanceManager.shutdownInstance();
+  return 0;
 }
 
 // //////////////////////////////////////////////////////////////////////////////
@@ -47,11 +49,6 @@ function recoverySuite () {
       let crashFile = internal.env["crash-log"];
 
       assertTrue(fs.isFile(crashFile), crashFile);
-
-      let platform = internal.platform;
-      if (platform !== 'linux') {
-        return;
-      }
 
       // find all warnings, errors, fatal errors...
       let lines = fs.readFileSync(crashFile).toString().trim().split("\n").filter(function(line) {
@@ -98,6 +95,11 @@ function recoverySuite () {
           // experimental feature
           return false;
         }
+        if (line.match(/\[a1690\].*Scheduler/)) {
+          // intentionally ignore shutdown warning
+          // experimental feature
+          return false;
+        }
         return true;
       });
 
@@ -112,13 +114,5 @@ function recoverySuite () {
 // / @brief executes the test suite
 // //////////////////////////////////////////////////////////////////////////////
 
-function main (argv) {
-  'use strict';
-  if (argv[1] === 'setup') {
-    runSetup();
-    return 0;
-  } else {
-    jsunity.run(recoverySuite);
-    return jsunity.writeDone().status ? 0 : 1;
-  }
-}
+jsunity.run(recoverySuite);
+return jsunity.done();

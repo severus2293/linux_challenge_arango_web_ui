@@ -24,10 +24,10 @@
 #pragma once
 
 #include "Aql/types.h"
-#include "Containers/HashSet.h"
 #include "Basics/ResourceUsage.h"
 
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -61,22 +61,15 @@ struct Variable;
 /// @brief AqlExpression, used in execution plans and execution blocks
 class Expression {
  public:
-  enum ExpressionType : uint32_t {
-    UNPROCESSED,
-    JSON,
-    SIMPLE,
-    ATTRIBUTE_ACCESS
-  };
-
   Expression(Expression const&) = delete;
   Expression& operator=(Expression const&) = delete;
   Expression() = delete;
 
   /// @brief constructor, using an AST start node
-  Expression(Ast*, AstNode*);
+  Expression(Ast* ast, AstNode* node);
 
   /// @brief constructor, using VPack
-  Expression(Ast*, arangodb::velocypack::Slice const&);
+  Expression(Ast* ast, velocypack::Slice slice);
 
   ~Expression();
 
@@ -111,13 +104,13 @@ class Expression {
   void variables(VarSet&) const;
 
   /// @brief return a VelocyPack representation of the expression
-  void toVelocyPack(arangodb::velocypack::Builder& builder, bool verbose) const;
+  void toVelocyPack(velocypack::Builder& builder, bool verbose) const;
 
   /// @brief execute the expression
   AqlValue execute(ExpressionContext* ctx, bool& mustDestroy);
 
   /// @brief get expression type as string
-  std::string typeString();
+  std::string_view typeString();
 
   // @brief invoke JavaScript aql functions with args as param.
 #ifdef USE_V8
@@ -176,8 +169,9 @@ class Expression {
   void freeInternals() noexcept;
 
   // find a value in an array
-  static bool findInArray(AqlValue const&, AqlValue const&,
-                          velocypack::Options const* vopts, AstNode const*);
+  static bool findInArray(AqlValue const& left, AqlValue const& right,
+                          velocypack::Options const* vopts,
+                          AstNode const* node);
 
   // analyze the expression (determine its type)
   void determineType();
@@ -316,9 +310,16 @@ class Expression {
   size_t _usedBytesByData = 0;
 
   // type of expression
+  enum class ExpressionType : uint32_t {
+    kUnprocessed,
+    kJson,
+    kSimple,
+    kAttributeAccess,
+  };
+
   ExpressionType _type;
 
-  arangodb::ResourceMonitor& _resourceMonitor;
+  ResourceMonitor& _resourceMonitor;
 };
 
 }  // namespace aql

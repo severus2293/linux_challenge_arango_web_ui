@@ -27,6 +27,7 @@
 #include "Agency/AsyncAgencyComm.h"
 #include "ApplicationFeatures/ApplicationServer.h"
 #include "Aql/QueryList.h"
+#include "Auth/UserManager.h"
 #include "Basics/VelocyPackHelper.h"
 #include "Cluster/ClusterFeature.h"
 #include "Cluster/ClusterInfo.h"
@@ -362,8 +363,17 @@ void BootstrapFeature::start() {
   _isReady = true;
 }
 
+void BootstrapFeature::stop() {
+  // notify all currently running queries about the shutdown
+  killRunningQueries();
+}
+
 void BootstrapFeature::unprepare() {
   // notify all currently running queries about the shutdown
+  killRunningQueries();
+}
+
+void BootstrapFeature::killRunningQueries() {
   auto& databaseFeature = server().getFeature<DatabaseFeature>();
 
   for (auto& name : databaseFeature.getDatabaseNames()) {

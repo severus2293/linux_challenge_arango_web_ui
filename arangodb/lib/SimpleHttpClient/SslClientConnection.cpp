@@ -22,10 +22,11 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <cerrno>
+#include <chrono>
 #include <cstring>
 #include <string>
+#include <string_view>
 
-#include "Basics/Common.h"
 #include "Basics/operating-system.h"
 
 #ifdef TRI_HAVE_WINSOCK2_H
@@ -33,9 +34,7 @@
 #include <WinSock2.h>
 #endif
 
-#if defined(__linux__) || defined(__APPLE__)
 #include <fcntl.h>
-#endif
 #include <openssl/opensslv.h>
 #include <openssl/ssl.h>
 #ifndef OPENSSL_VERSION_NUMBER
@@ -59,7 +58,6 @@
 #include "Logger/Logger.h"
 #include "Logger/LoggerStream.h"
 #include "Ssl/ssl-helper.h"
-#include <chrono>
 
 #undef TRACE_SSL_CONNECTIONS
 
@@ -72,7 +70,7 @@ using namespace arangodb::httpclient;
 namespace {
 
 #ifdef TRACE_SSL_CONNECTIONS
-static char const* tlsTypeName(int type) {
+static std::string_view tlsTypeName(int type) {
   switch (type) {
 #ifdef SSL3_RT_HEADER
     case SSL3_RT_HEADER:
@@ -86,6 +84,8 @@ static char const* tlsTypeName(int type) {
       return "TLS handshake";
     case SSL3_RT_APPLICATION_DATA:
       return "TLS app data";
+    case SSL3_RT_INNER_CONTENT_TYPE:
+      return "TLS inner content type";
     default:
       return "TLS Unknown";
   }
@@ -156,7 +156,7 @@ static void sslTlsTrace(int direction, int sslVersion, int contentType,
   // enable this for tracing SSL connections
   if (sslVersion) {
     sslVersion >>= 8; /* check the upper 8 bits only below */
-    char const* tlsRtName;
+    std::string_view tlsRtName;
     if (sslVersion == SSL3_VERSION_MAJOR && contentType)
       tlsRtName = tlsTypeName(contentType);
     else
@@ -185,7 +185,9 @@ SslClientConnection::SslClientConnection(
       _ssl(nullptr),
       _ctx(nullptr),
       _sslProtocol(sslProtocol),
-      _socketFlags(0) {
+      _socketFlags(0),
+      _verifyDepth(10),
+      _verifyCertificates(false) {
   init(sslProtocol);
 }
 
@@ -198,7 +200,8 @@ SslClientConnection::SslClientConnection(
       _ssl(nullptr),
       _ctx(nullptr),
       _sslProtocol(sslProtocol),
-      _socketFlags(0) {
+      _socketFlags(0),
+      _verifyCertificates(false) {
   init(sslProtocol);
 }
 
@@ -355,7 +358,15 @@ bool SslClientConnection::connectSocket() {
     return false;
   }
 
-  SSL_set_verify(_ssl, SSL_VERIFY_NONE, nullptr);
+  if (_verifyCertificates) {
+    SSL_set_verify(_ssl, SSL_VERIFY_PEER, nullptr);
+    SSL_set_verify_depth(_ssl, _verifyDepth);
+
+    SSL_CTX_set_default_verify_paths(_ctx);
+    SSL_CTX_set_default_verify_dir(_ctx);
+  } else {
+    SSL_set_verify(_ssl, SSL_VERIFY_NONE, nullptr);
+  }
 
   ERR_clear_error();
 
@@ -405,6 +416,8 @@ bool SslClientConnection::connectSocket() {
     /* Gets the earliest error code from the
        thread's error queue and removes the entry. */
     unsigned long lastError = ERR_get_error();
+
+    _errorDetails.append(ERR_error_string(lastError, nullptr)).append(" - ");
 
     if (errorDetail == SSL_ERROR_SYSCALL && lastError == 0) {
       if (ret == 0) {
@@ -630,7 +643,6 @@ bool SslClientConnection::readable() {
 }
 
 bool SslClientConnection::setSocketToNonBlocking() {
-#if defined(__linux__) || defined(__APPLE__)
   _socketFlags = fcntl(_socket.fileDescriptor, F_GETFL, 0);
   if (_socketFlags == -1) {
     _errorDetails = "Socket file descriptor read returned with error " +
@@ -642,33 +654,24 @@ bool SslClientConnection::setSocketToNonBlocking() {
                     std::to_string(errno);
     return false;
   }
-#else
-  u_long nonBlocking = 1;
-  if (ioctlsocket(_socket.fileDescriptor, FIONBIO, &nonBlocking) != 0) {
-    _errorDetails = "Attempt to create non-blocking socket generated error " +
-                    std::to_string(WSAGetLastError());
-    return false;
-  }
-#endif
   return true;
 }
 
 bool SslClientConnection::cleanUpSocketFlags() {
   TRI_ASSERT(_isSocketNonBlocking);
-#if defined(__linux__) || defined(__APPLE__)
   if (fcntl(_socket.fileDescriptor, F_SETFL, _socketFlags & ~O_NONBLOCK) ==
       -1) {
     _errorDetails = "Attempt to make socket blocking generated error " +
                     std::to_string(errno);
     return false;
   }
-#else
-  u_long nonBlocking = 0;
-  if (ioctlsocket(_socket.fileDescriptor, FIONBIO, &nonBlocking) != 0) {
-    _errorDetails = "Attempt to make socket blocking generated error " +
-                    std::to_string(WSAGetLastError());
-    return false;
-  }
-#endif
   return true;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+/// @brief return whether the connection is still OK
+//////////////////////////////////////////////////////////////////////////////
+
+bool SslClientConnection::test_idle_connection() {
+  return TRI_socket_test_idle_connection(_socket);
 }

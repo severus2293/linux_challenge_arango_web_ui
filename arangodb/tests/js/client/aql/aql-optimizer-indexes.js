@@ -1400,7 +1400,7 @@ function optimizerIndexesTestSuite () {
       var plan = db._createStatement({query: query, bindVars: {}, options: opt}).explain().plan;
       var nodeTypes = plan.nodes.map(function(node) {
         if (node.type === "IndexNode") {
-          assertTrue(node.producesResult);
+          assertFalse(node.producesResult);
           assertEqual("skiplist", node.indexes[0].type);
           assertFalse(node.indexes[0].unique);
         }
@@ -1408,6 +1408,7 @@ function optimizerIndexesTestSuite () {
       });
 
       assertNotEqual(-1, nodeTypes.indexOf("IndexNode"), query);
+      assertNotEqual(-1, nodeTypes.indexOf("MaterializeNode"), query);
 
       var results = db._query(query, {}, opt);
       assertEqual([ 2, 3, 4, 5, 6, 7, 8 ], results.toArray().sort(), query);
@@ -2604,7 +2605,7 @@ function optimizerIndexesModifyTestSuite () {
 
     testIndexAndHashIndexedNonIndexed : function () {
       // drop the skiplist index
-      c.dropIndex(c.getIndexes()[1]);
+      c.dropIndex(c.indexes()[1]);
       c.ensureIndex({ type: "hash", fields: ["value"] });
       // value2 is not indexed
       db._query("FOR i IN " + c.name() + " UPDATE i WITH { value2: i.value } IN " + c.name());
@@ -2680,7 +2681,7 @@ function optimizerIndexesModifyTestSuite () {
 
     testIndexAndSkiplistPartialIndexedNonIndexed : function () {
       // drop the skiplist index
-      c.dropIndex(c.getIndexes()[1]);
+      c.dropIndex(c.indexes()[1]);
 
       // create an alternative index
       c.ensureIndex({ type: "skiplist", fields: ["value", "value3"] });
