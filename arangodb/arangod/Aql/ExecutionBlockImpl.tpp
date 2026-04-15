@@ -26,7 +26,6 @@
 
 #pragma once
 
-#include "Basics/Exceptions.h"
 #include "ExecutionBlockImpl.h"
 
 #include "Aql/AqlCallStack.h"
@@ -88,7 +87,6 @@ class MaterializeRocksDBExecutor;
 class MaterializeSearchExecutor;
 template<typename FetcherType, typename ModifierType>
 class ModificationExecutor;
-struct IndexDistinctScanExecutor;
 
 class LimitExecutor;
 class ReturnExecutor;
@@ -116,8 +114,6 @@ class DistinctCollectExecutor;
 class EnumerateCollectionExecutor;
 class EnumerateListExecutor;
 class EnumerateListObjectExecutor;
-class GroupedSortExecutor;
-class EnumerateNearVectorsExecutor;
 }  // namespace aql
 
 namespace graph {
@@ -349,33 +345,11 @@ ExecutionBlockImpl<Executor>::ExecutionBlockImpl(
 
 template<class Executor>
 ExecutionBlockImpl<Executor>::~ExecutionBlockImpl() {
-  stopAsyncTasks();
-}
-
-template<class Executor>
-void ExecutionBlockImpl<Executor>::stopAsyncTasks() {
-  _stoppedAsyncTasks = true;
-  if (_prefetchTask) {
-    // Double use diagnostics:
-    uint64_t userCount = _numberOfUsers.fetch_add(1);
-    if (userCount > 0) {
-      _logStacktrace.store(true, std::memory_order_relaxed);
-      LOG_TOPIC("52637", WARN, Logger::AQL)
-          << "ALERT: Double use of ExecutionBlock detected, stacktrace:";
-      CrashHandler::logBacktrace();
-    }
-    auto guard = scopeGuard([&]() noexcept {
-      _numberOfUsers.fetch_sub(1);
-      if (_logStacktrace.load(std::memory_order_relaxed)) {
-        LOG_TOPIC("52638", WARN, Logger::AQL) << "ALERT: Found _logStacktrace:";
-        CrashHandler::logBacktrace();
-      }
-    });
-    if (!_prefetchTask->isConsumed() && !_prefetchTask->tryClaim()) {
-      // some thread is still working on our prefetch task
-      // -> we need to wait for that task to finish first!
-      _prefetchTask->waitFor();
-    }
+  if (_prefetchTask && !_prefetchTask->isConsumed() &&
+      !_prefetchTask->tryClaim()) {
+    // some thread is still working on our prefetch task
+    // -> we need to wait for that task to finish first!
+    _prefetchTask->waitFor();
   }
 }
 
@@ -512,22 +486,6 @@ void ExecutionBlockImpl<Executor>::collectExecStats(ExecutionStats& stats) {
 template<class Executor>
 std::tuple<ExecutionState, SkipResult, SharedAqlItemBlockPtr>
 ExecutionBlockImpl<Executor>::execute(AqlCallStack const& stack) {
-  // Double use diagnostics:
-  uint64_t userCount = _numberOfUsers.fetch_add(1);
-  if (userCount > 0) {
-    _logStacktrace.store(true, std::memory_order_relaxed);
-    LOG_TOPIC("52635", WARN, Logger::AQL)
-        << "ALERT: Double use of ExecutionBlock detected, stacktrace:";
-    CrashHandler::logBacktrace();
-  }
-  auto waechter = scopeGuard([&]() noexcept {
-    _numberOfUsers.fetch_sub(1);
-    if (_logStacktrace.load(std::memory_order_relaxed)) {
-      LOG_TOPIC("52636", WARN, Logger::AQL) << "ALERT: Found _logStacktrace:";
-      CrashHandler::logBacktrace();
-    }
-  });
-
 #ifdef ARANGODB_ENABLE_MAINTAINER_MODE
   bool old = false;
   TRI_ASSERT(_isBlockInUse.compare_exchange_strong(old, true));
@@ -863,7 +821,6 @@ static SkipRowsRangeVariant constexpr skipRowsType() {
                   AccuWindowExecutor, WindowExecutor, IndexExecutor,
                   EnumerateCollectionExecutor, DistinctCollectExecutor,
                   ConstrainedSortExecutor, CountCollectExecutor,
-                  GroupedSortExecutor,
 #ifdef ARANGODB_USE_GOOGLE_TESTS
                   TestLambdaSkipExecutor,
 #endif
@@ -892,7 +849,6 @@ static SkipRowsRangeVariant constexpr skipRowsType() {
                   SingleRemoteModificationExecutor<Replace>,
                   SingleRemoteModificationExecutor<Upsert>,
                   MultipleRemoteModificationExecutor, SortExecutor,
-                  EnumerateNearVectorsExecutor, IndexDistinctScanExecutor,
                   // only available in Enterprise
                   arangodb::iresearch::OffsetMaterializeExecutor,
                   MaterializeSearchExecutor>) ||
@@ -1073,44 +1029,12 @@ auto ExecutionBlockImpl<Executor>::executeFetcher(ExecutionContext& ctx,
       // At the moment we may spawn one task per execution node
 
       if (shouldSchedule) {
-        bool const queued = SchedulerFeature::SCHEDULER->tryBoundedQueue(
+        bool queued = SchedulerFeature::SCHEDULER->tryBoundedQueue(
             RequestLane::INTERNAL_LOW,
             [block = this, task = _prefetchTask]() mutable {
               if (!task->tryClaimOrAbandon()) {
                 return;
               }
-
-              // We are entering debugging land here.
-              // Someone hasasked as to stop async tasks.
-              // But here we are just starting to work on one.
-              // This is okay and can rarely happen. But if it happens
-              // We want to know if we start the task and finish it quickly
-
-              bool hasStoppedAsyncTasks = block->hasStoppedAsyncTasks();
-              if (hasStoppedAsyncTasks) {
-                LOG_TOPIC("14d22", WARN, Logger::AQL)
-                    << "[query#" << block->getQuery().id() << "] ALERT"
-                    << block->printBlockInfo()
-                    << " was asked to stop async task. We still start one. "
-                       "This is an allowed rare race.";
-              }
-
-              auto stopGuard =
-                  ScopeGuard([block, hasStoppedAsyncTasks]() noexcept {
-                    if (hasStoppedAsyncTasks) {
-                      LOG_TOPIC("14d21", WARN, Logger::AQL)
-                          << "[query#" << block->getQuery().id()
-                          << "] CLEAR ALERT" << block->printBlockInfo()
-                          << " We completed the task of the aforementioned "
-                             "race. All is fine.";
-                    }
-                  });
-
-              TRI_IF_FAILURE("AsyncPrefetch::blocksDestroyedOutOfOrder") {
-                using namespace std::chrono_literals;
-                std::this_thread::sleep_for(100ms);
-              }
-
               // task is a copy of the PrefetchTask shared_ptr, and we will only
               // attempt to execute the task if we successfully claimed the
               // task. i.e., it does not matter if this task lingers around in
@@ -2639,39 +2563,16 @@ bool ExecutionBlockImpl<Executor>::PrefetchTask::rearmForNextCall(
 
 template<class Executor>
 void ExecutionBlockImpl<Executor>::PrefetchTask::waitFor() const noexcept {
-  uint64_t count = _numberWaiters.fetch_add(1, std::memory_order_relaxed);
-  if (count > 0) {
-    LOG_TOPIC("62515", WARN, Logger::AQL)
-        << "ALERT: Detected " << count + 1
-        << " waiters for a PrefetchTask, stacktrace:";
-    CrashHandler::logBacktrace();
-    _logStacktrace.store(true, std::memory_order_relaxed);
-  }
   std::unique_lock<std::mutex> guard(_lock);
   // (1) - this acquire-load synchronizes with the release-store (3)
-  while (_state.load(std::memory_order_acquire).status != Status::Finished) {
-    std::cv_status s = _bell.wait_for(guard, std::chrono::milliseconds(1000));
-    if (s == std::cv_status::timeout) {
-      auto state = _state.load(std::memory_order_relaxed);
-      // We put "ALERT: " in if the status is not "InProgress", since
-      // this is the only one we expect when a timeout occurs!
-      std::string_view alerting =
-          state.status == Status::InProgress ? "" : "ALERT: ";
-      LOG_TOPIC("62514", WARN, Logger::AQL)
-          << alerting
-          << "Have waited for a second on an async prefetch task, state "
-             "is "
-          << (int)state.status << " abandoned: " << state.abandoned;
-    }
+  if (_state.load(std::memory_order_acquire).status == Status::Finished) {
+    return;
   }
-  count = _numberWaiters.fetch_sub(1);
-  if (_logStacktrace.load(std::memory_order_relaxed) == true) {
-    LOG_TOPIC("62516", WARN, Logger::AQL) << "ALERT: Found logStacktrace:";
-    CrashHandler::logBacktrace();
-    if (count == 0) {
-      _logStacktrace.store(false, std::memory_order_relaxed);
-    }
-  }
+
+  _bell.wait(guard, [this]() {
+    // (2) - this acquire-load synchronizes with the release-store (3)
+    return _state.load(std::memory_order_acquire).status == Status::Finished;
+  });
 }
 
 template<class Executor>

@@ -58,7 +58,6 @@ add_library(arango_rocksdb STATIC
   RocksDBUpgrade.cpp
   RocksDBVPackIndex.cpp
   RocksDBValue.cpp
-  RocksDBVectorIndex.cpp
   RocksDBWalAccess.cpp
   ReplicatedRocksDBTransactionState.cpp
   SimpleRocksDBTransactionState.cpp
@@ -82,8 +81,7 @@ target_link_libraries(arango_rocksdb
   boost_boost
   rocksdb
   rocksdb_interface
-  snappy
-  faiss)
+  snappy)
 
 set(SNAPPY_INCLUDE_DIR "${SNAPPY_SOURCE_DIR};${SNAPPY_BUILD_DIR}" CACHE PATH "relation to snappy")
 target_include_directories(arango_rocksdb PUBLIC ${SNAPPY_INCLUDE_DIR})
@@ -93,8 +91,7 @@ if (USE_ENTERPRISE)
   target_include_directories(arango_rocksdb PUBLIC
     ${IRESEARCH_INCLUDE})
   target_link_libraries(arango_rocksdb
-    arango_rclone 
-  )
+    arango_rclone)
 endif()
 
 if ((CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_CLANG) AND ARCH_AMD64)

@@ -1,9 +1,11 @@
-import { ReactTable, TableControl, useSortableReactTable } from "@arangodb/ui";
 import { Link, Stack } from "@chakra-ui/react";
 import { createColumnHelper } from "@tanstack/react-table";
 import { GenericAnalyzerDescription } from "arangojs/analyzer";
 import React from "react";
 import { useHistory } from "react-router-dom";
+import { ReactTable } from "../../../components/table/ReactTable";
+import { TableControl } from "../../../components/table/TableControl";
+import { useSortableReactTable } from "../../../components/table/useSortableReactTable";
 import { encodeHelper } from "../../../utils/encodeHelper";
 import { AnalyzerTypes } from "../Analyzer.types";
 import { useAnalyzersContext } from "../AnalyzersContext";
@@ -96,7 +98,10 @@ export const AnalyzersTable = () => {
   const history = useHistory();
   return (
     <Stack>
-      <TableControl<AnalyzerDataType> table={tableInstance} />
+      <TableControl<AnalyzerDataType>
+        table={tableInstance}
+        columns={TABLE_COLUMNS}
+      />
       <ReactTable<AnalyzerDataType>
         table={tableInstance}
         emptyStateMessage="No analyzers found"

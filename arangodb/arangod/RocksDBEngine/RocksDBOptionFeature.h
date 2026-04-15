@@ -172,7 +172,6 @@ class RocksDBOptionFeature final : public ArangodFeature,
   bool _partitionFilesForEdgeIndexCf;
   bool _partitionFilesForVPackIndexCf;
   bool _partitionFilesForMdiIndexCf;
-  bool _partitionFilesForVectorIndexCf;
 
   /// per column family write buffer limits
   std::array<uint64_t, RocksDBColumnFamilyManager::numberOfColumnFamilies>

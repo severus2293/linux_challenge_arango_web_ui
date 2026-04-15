@@ -73,8 +73,8 @@ set(ARANGODB_VERSION_MINOR "12")
 
 # when building the nightly ARANGODB_VERSION_PATCH will be set
 if (NOT DEFINED ARANGODB_VERSION_PATCH)
-  set(ARANGODB_VERSION_PATCH "4")
-  set(ARANGODB_VERSION_RELEASE_TYPE "3")
+  set(ARANGODB_VERSION_PATCH "3")
+  set(ARANGODB_VERSION_RELEASE_TYPE "1")
   set(ARANGODB_VERSION_RELEASE_NUMBER "")
 else()
   unset (ARANGODB_VERSION_RELEASE_TYPE) # do not remove space
@@ -155,11 +155,6 @@ option(STATIC_EXECUTABLES "produce static executables" OFF)
 if (STATIC_EXECUTABLES)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
   set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
-endif()
-
-# If enterprise add USE_ENTERPRISE flag to all targets
-if (USE_ENTERPRISE)
-  add_definitions("-DUSE_ENTERPRISE=1")
 endif()
 
 # enable V8/JavaScript in executables. 
@@ -796,10 +791,6 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "11.0")
     # clang 11 and higher supports -Wsuggest-override. older versions don't
     set(EXTRA_CXX_FLAGS "-Wsuggest-override ${EXTRA_CXX_FLAGS}")
-  endif ()
-  if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "19.0")
-  # broken warnings in clang-19
-    set(EXTRA_CXX_FLAGS "${EXTRA_CXX_FLAGS} -Wno-error=missing-designated-field-initializers")
   endif ()
 else ()
   # unknown compiler

@@ -298,11 +298,11 @@ class agencyMgr {
   detectAgencyAlive(httpAuthOptions) {
     if (!this.options.agency ||
         !this.shouldBeCompleted() ||
-        this.moreIsAlreadyRunning()) {
+        !this.moreIsAlreadyRunning()) {
       print("no agency check this time.");
       return;
     }
-    let count = (isArm || this.options.isInstrumented) ? 75 : 30;
+    let count = (isArm || this.options.isInstrumented) ? 75 : 25;
     while (count > 0) {
       let haveConfig = 0;
       let haveLeader = 0;

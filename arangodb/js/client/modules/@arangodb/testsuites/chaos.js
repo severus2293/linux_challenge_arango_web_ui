@@ -27,8 +27,7 @@
 
 const functionsDocumentation = {
   'chaos': 'chaos tests',
-  'deadlock': 'deadlock tests',
-  'chaos_subq': 'subquery chaos tests',
+  'deadlock': 'deadlock tests'
 };
 
 const _ = require('lodash');
@@ -38,7 +37,6 @@ const trs = require('@arangodb/testutils/testrunners');
 const testPaths = {
   'chaos': [ tu.pathForTesting('client/chaos') ],
   'deadlock': [ tu.pathForTesting('client/chaos') ], // intentionally same path as chaos
-  'chaos_subq': [ tu.pathForTesting('client/chaos_subq') ],
 };
 
 function chaos (options) {
@@ -109,21 +107,9 @@ function deadlock (options) {
   return new trs.runLocalInArangoshRunner(options, 'deadlock', {"--server.maximal-threads":"8"}).run(testCases);
 }
 
-function subQueryChaos (options) {
-  let testCases;
-  let name = 'shell_client_subquerychaos';
-  testCases = tu.scanTestPaths(testPaths.chaos_subq, options);
-  testCases = tu.splitBuckets(options, testCases);
-
-  let rc = new trs.runLocalInArangoshRunner(options, name, {}).run(testCases);
-  return rc;
-}
-
-
 exports.setup = function (testFns, opts, fnDocs, optionsDoc, allTestPaths) {
   Object.assign(allTestPaths, testPaths);
   testFns['chaos'] = chaos;
   testFns['deadlock'] = deadlock;
-  testFns['chaos_subq'] = subQueryChaos;
   tu.CopyIntoObject(fnDocs, functionsDocumentation);
 };

@@ -43,11 +43,9 @@ const {
 
 let IM = global.instanceManager;
 
-let waitFor = 60;
-let factor = 1;
+let waitFor = 60; //isCov ? 60 * 4 : 60;
 if (versionHas('asan') || versionHas('tsan') || versionHas('coverage')) {
-  waitFor *= 20;
-  factor = 5;
+  waitFor *= 10;
 }
 
 
@@ -230,7 +228,7 @@ while (id !== null) {
       ];
 
       // run the suite for a while...
-      runTests(tests, 30 * factor);
+      runTests(tests, 30);
 
       // finally kill off all remaining pending jobs
       let tries = 0;

@@ -65,7 +65,7 @@ class ManagerFeature final : public ArangodFeature {
   void queueGarbageCollection();
 
   static constexpr size_t defaultStreamingMaxTransactionSize =
-      512 * 1024 * 1024;  // 512 MiB
+      128 * 1024 * 1024;  // 128 MiB
   static constexpr double defaultStreamingIdleTimeout = 60.0;
   static constexpr double maxStreamingIdleTimeout = 120.0;
 

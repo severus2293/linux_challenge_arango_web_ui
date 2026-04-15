@@ -63,10 +63,10 @@ class SingleRemoteOperationNode final : public ExecutionNode,
   // We probably do not need this, because the rule will only be used on the
   // coordinator
   SingleRemoteOperationNode(ExecutionPlan* plan,
-                            arangodb::velocypack::Slice base);
+                            arangodb::velocypack::Slice const& base);
 
   /// @brief return the type of the node
-  NodeType getType() const override final { return REMOTE_SINGLE; }
+  NodeType getType() const override final { return REMOTESINGLE; }
 
   /// @brief return the amount of bytes used
   size_t getMemoryUsedBytes() const override;

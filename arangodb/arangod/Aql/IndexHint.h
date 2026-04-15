@@ -81,10 +81,6 @@ class IndexHint {
   bool isNested() const noexcept;
   bool isDisabled() const noexcept;
 
-  bool shouldPushDownMaterialization() const noexcept {
-    return _pushDownMaterialization;
-  }
-
   PossibleIndexes const& candidateIndexes() const noexcept;
 
   void toVelocyPack(velocypack::Builder& builder) const;
@@ -131,7 +127,6 @@ class IndexHint {
   bool _forced{false};
   bool _waitForSync{false};
   size_t _lookahead{1};
-  bool _pushDownMaterialization{false};
 
   // there is an important distinction between NoContents and Disabled here:
   //   NoContents = no index hint set

@@ -8,32 +8,23 @@ parameters:
   enterprise-commit:
     type: string
     default: ""
-  arangosh_args:
-    type: string
-    default: ""
   use-minimal-debug-info:
     type: boolean
     default: true
   build-docker-image:
     type: string
-    default: "arangodb/ubuntubuildarangodb-devel:11"
+    default: "arangodb/ubuntubuildarangodb-devel:7"
   test-docker-image:
     type: string
-    default: public.ecr.aws/b0b8h2r4/test-ubuntu:24.04-f4631392
+    default: public.ecr.aws/b0b8h2r4/test-ubuntu:23.10-5b6113b7
   # Unused here, but it will be forwarded from config and will cause errors if not defined
   enterprise-branch:
     type: string
     default: ""
-  oskar-branch:
-    type: string
-    default: "master"
   dont-cancel-pipelines:
     type: boolean
     default: false
   create-docker-images:
-    type: boolean
-    default: false
-  rebuild-test-docker-images:
     type: boolean
     default: false
   nightly:
@@ -325,7 +316,6 @@ jobs:
             if [ << pipeline.parameters.use-minimal-debug-info >> = true ]; then
               MINIMAL_DEBUGINFO="ON"
             fi
-
             cmake --preset << parameters.preset >> \
               -DCMAKE_C_COMPILER=<< pipeline.parameters.c-compiler >> \
               -DCMAKE_CXX_COMPILER=<< pipeline.parameters.cxx-compiler >> \
@@ -335,7 +325,7 @@ jobs:
               -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
               -DOPENSSL_ROOT_DIR=/opt \
               -DUSE_MINIMAL_DEBUGINFO=$MINIMAL_DEBUGINFO \
-              -DCMAKE_INSTALL_PREFIX=/ 
+              -DCMAKE_INSTALL_PREFIX=/
       - run:
           name: Build
           command: |
@@ -366,8 +356,7 @@ jobs:
                   curl -s -L -o build/bin/arangodb "https://github.com/arangodb-helper/arangodb/releases/download/$STARTER_REV/arangodb-linux-$arch"
                   chmod a+x build/bin/arangodb
                   if [ << parameters.enterprise >> = true ]; then
-                    OSKAR_BRANCH=<< pipeline.parameters.oskar-branch >>
-                    curl -s -L -o build/bin/rclone-arangodb "https://github.com/arangodb/oskar/raw/$OSKAR_BRANCH/rclone/v$RCLONE_VERSION/rclone-arangodb-linux-$arch"
+                    curl -s -L -o build/bin/rclone-arangodb "https://github.com/arangodb/oskar/raw/master/rclone/v$RCLONE_VERSION/rclone-arangodb-linux-$arch"
                     chmod a+x build/bin/rclone-arangodb
                   fi
       - when:
@@ -474,9 +463,6 @@ jobs:
         type: string
       suites:
         type: string
-      arangosh_args:
-        type: string
-        default: ""
       size:
         type: string
       extraArgs:
@@ -543,7 +529,6 @@ jobs:
             export TIMELIMIT=<< parameters.timeLimit >>
             # Note: we need the leading space for extraArgs to avoid a parsing issue in argparse
             python3 -u scripts/test/test_launch_controller.py << parameters.suites >> \
-              --arangosh_args '<< parameters.arangosh_args >>' \
               --testBuckets $CIRCLE_NODE_TOTAL/$CIRCLE_NODE_INDEX \
               --cluster << parameters.cluster >> \
               --extraArgs ' << parameters.extraArgs >>'
@@ -610,9 +595,6 @@ jobs:
       rta-branch:
         type: string
         default: "main"
-      arangosh_args:
-        type: string
-        default: ""
     steps:
       - add_ssh_keys:
           fingerprints:

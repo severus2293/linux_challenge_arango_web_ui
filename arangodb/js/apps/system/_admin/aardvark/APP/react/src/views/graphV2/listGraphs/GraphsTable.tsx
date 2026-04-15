@@ -1,10 +1,12 @@
-import { ReactTable, TableControl, useSortableReactTable } from "@arangodb/ui";
 import { EditIcon } from "@chakra-ui/icons";
 import { Button, Link, Stack, useDisclosure } from "@chakra-ui/react";
 import { CellContext, createColumnHelper } from "@tanstack/react-table";
 import { GraphInfo } from "arangojs/graph";
 import React from "react";
 import { Link as RouterLink } from "react-router-dom";
+import { ReactTable } from "../../../components/table/ReactTable";
+import { TableControl } from "../../../components/table/TableControl";
+import { useSortableReactTable } from "../../../components/table/useSortableReactTable";
 import { EditGraphModal } from "./EditGraphModal";
 import { detectGraphType } from "./graphListHelpers";
 import { useGraphsListContext } from "./GraphsListContext";
@@ -98,7 +100,10 @@ export const GraphsTable = () => {
   return (
     <>
       <Stack>
-        <TableControl<GraphInfo> table={tableInstance} />
+        <TableControl<GraphInfo>
+          table={tableInstance}
+          columns={TABLE_COLUMNS}
+        />
         <ReactTable<GraphInfo>
           table={tableInstance}
           emptyStateMessage="No graphs found"

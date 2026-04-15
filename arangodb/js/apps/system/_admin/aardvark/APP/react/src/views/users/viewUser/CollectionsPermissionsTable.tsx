@@ -1,7 +1,8 @@
-import { ReactTable, useSortableReactTable } from "@arangodb/ui";
 import { Box, Flex, Tag } from "@chakra-ui/react";
 import { createColumnHelper, Row } from "@tanstack/react-table";
 import React from "react";
+import { ReactTable } from "../../../components/table/ReactTable";
+import { useSortableReactTable } from "../../../components/table/useSortableReactTable";
 import { CollectionDefaultRowWarningPopover } from "./CollectionDefaultRowWarningPopover";
 import { CollectionPermissionSwitch } from "./CollectionPermissionSwitch";
 import { getIsDefaultRow } from "./DatabasePermissionSwitch";

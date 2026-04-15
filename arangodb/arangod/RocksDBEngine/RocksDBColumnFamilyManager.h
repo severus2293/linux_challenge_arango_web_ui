@@ -29,7 +29,6 @@
 
 #include <array>
 #include <cstdint>
-#include <span>
 
 namespace arangodb {
 
@@ -52,7 +51,6 @@ struct RocksDBColumnFamilyManager {
     ReplicatedLogs = 7,
     MdiIndex = 8,
     MdiVPackIndex = 9,
-    VectorIndex = 10,
 
     Invalid = 1024  // special placeholder
   };
@@ -63,7 +61,7 @@ struct RocksDBColumnFamilyManager {
   };
 
   static constexpr size_t minNumberOfColumnFamilies = 7;
-  static constexpr size_t numberOfColumnFamilies = 11;
+  static constexpr size_t numberOfColumnFamilies = 10;
 
   static void initialize();
 
@@ -74,11 +72,8 @@ struct RocksDBColumnFamilyManager {
   static char const* name(rocksdb::ColumnFamilyHandle* handle,
                           NameMode mode = NameMode::External);
 
-  /// We purposefully cut off the handles still set to nullptr, since they were
-  /// not initialized
-  /// TODO find better solution that propagates changes to how many column
-  /// families there are on start time
-  static std::span<rocksdb::ColumnFamilyHandle*> allHandles();
+  static std::array<rocksdb::ColumnFamilyHandle*, numberOfColumnFamilies> const&
+  allHandles();
 
  private:
   static std::array<char const*, numberOfColumnFamilies> _internalNames;

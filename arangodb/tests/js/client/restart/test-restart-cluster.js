@@ -30,8 +30,7 @@ const _ = require('lodash');
 const pu = require('@arangodb/testutils/process-utils');
 const crypto = require('@arangodb/crypto');
 const request = require("@arangodb/request");
-const { time, sleep } = require("internal");
-let IM = global.instanceManager;
+const time = require("internal").time;
 
 const {
   getCtrlCoordinators,
@@ -223,10 +222,7 @@ function testSuite() {
           "preferred_username": "root",
           "iss": "arangodb", "exp": Math.floor(Date.now() / 1000) + 3600
         }, 'HS256');
-
-        if (IM.options.isInstrumented) {
-          sleep(5);
-        }
+    
         let aliveStatus = waitForAlive(30, coordinator.url, { auth: { bearer: jwt } });
         // note: this should actually work, but currently doesn't TODO
         assertTrue([500, 503].indexOf(aliveStatus.status) !== -1, JSON.stringify(aliveStatus));

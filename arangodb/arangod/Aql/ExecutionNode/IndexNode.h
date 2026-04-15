@@ -133,10 +133,7 @@ class IndexNode : public ExecutionNode,
   /// not all queries that use an index will need to produce a sorted result
   /// (e.g. if the index is used only for filtering)
   bool needsGatherNodeSort() const;
-  void needsGatherNodeSort(SortElementVector elements);
-  SortElementVector const& getSortElements() const noexcept {
-    return _sortElements;
-  }
+  void needsGatherNodeSort(bool value);
 
   /// @brief creates corresponding ExecutionBlock
   std::unique_ptr<ExecutionBlock> createBlock(
@@ -246,7 +243,7 @@ class IndexNode : public ExecutionNode,
   std::unique_ptr<Condition> _condition;
 
   /// @brief the index sort order - this is the same order for all indexes
-  SortElementVector _sortElements;
+  bool _needsGatherNodeSort;
 
   /// @brief We have single index and this index covered whole condition
   bool _allCoveredByOneIndex;

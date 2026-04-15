@@ -1,9 +1,10 @@
-import { ReactTable, useSortableReactTable } from "@arangodb/ui";
 import { Box, Button, Flex, ModalFooter, ModalHeader } from "@chakra-ui/react";
 import { QueryInfo } from "arangojs/database";
-import moment from "moment";
 import React from "react";
+import moment from "moment";
 import { Modal } from "../../../components/modal";
+import { ReactTable } from "../../../components/table/ReactTable";
+import { useSortableReactTable } from "../../../components/table/useSortableReactTable";
 import { getCurrentDB } from "../../../utils/arangoClient";
 import { useFetchSlowQueries } from "./useFetchSlowQueries";
 

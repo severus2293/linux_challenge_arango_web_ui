@@ -98,16 +98,11 @@ void SortElement::replaceAttributeAccess(Variable const* searchVariable,
   var = replaceVariable;
 }
 
-std::string SortElement::toVarAccessString() const {
+std::string SortElement::toString() const {
   std::string result = absl::StrCat("$", var->id);
   for (auto const& it : attributePath) {
     absl::StrAppend(&result, ".", it);
   }
-  return result;
-}
-
-std::string SortElement::toString() const {
-  std::string result = toVarAccessString();
   absl::StrAppend(&result, ascending ? " ASC" : " DESC");
   return result;
 }
@@ -141,11 +136,4 @@ SortElement SortElement::fromVelocyPack(Ast* ast, velocypack::Slice info) {
     }
   }
   return elem;
-}
-
-std::ostream& arangodb::aql::operator<<(std::ostream& os,
-                                        SortElement const& se) noexcept {
-  using arangodb::operator<<;
-  return os << se.var->name << se.attributePath << " "
-            << (se.ascending ? "ASC" : "DESC");
 }

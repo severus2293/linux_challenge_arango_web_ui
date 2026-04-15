@@ -141,7 +141,6 @@ class RocksDBEngine;
 class RocksDBIndexCacheRefillFeature;
 class RocksDBOptionFeature;
 class RocksDBRecoveryManager;
-class VectorIndexFeature;
 
 namespace transaction {
 
@@ -254,7 +253,6 @@ using ArangodFeaturesList = TypeList<
     ReplicationMetricsFeature,
     ReplicationTimeoutFeature,
     SchedulerFeature,
-    VectorIndexFeature,
 #ifdef USE_V8
     ScriptFeature,
 #endif

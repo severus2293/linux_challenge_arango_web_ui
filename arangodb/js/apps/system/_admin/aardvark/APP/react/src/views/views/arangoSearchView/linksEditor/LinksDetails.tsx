@@ -1,8 +1,9 @@
-import { InfoTooltip } from "@arangodb/ui";
 import { Checkbox, Grid, HStack, Stack } from "@chakra-ui/react";
+
 import { useFormikContext } from "formik";
 import { get } from "lodash";
 import React from "react";
+import { InfoTooltip } from "../../../../components/tooltip/InfoTooltip";
 import { useEditViewContext } from "../../editView/EditViewContext";
 import { ArangoSearchViewPropertiesType } from "../../View.types";
 import { AnalyzersDropdown } from "./AnalyzersDropdown";
@@ -53,7 +54,7 @@ export const LinksDetails = () => {
             tooltip={
               window.frontendConfig.isEnterprise
               ? "Always cache field normalization values in memory."
-              : "Field normalization value caching is available in the Enterprise Edition."
+              : "Field normalization value caching is available in Enterprise plans."
             }
           />
           {!isFieldView && (

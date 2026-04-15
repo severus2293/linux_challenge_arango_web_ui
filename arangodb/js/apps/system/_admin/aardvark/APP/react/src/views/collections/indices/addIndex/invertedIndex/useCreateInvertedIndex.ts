@@ -124,7 +124,7 @@ export const invertedIndexFieldsMap = {
     group: "fields", 
     tooltip: window.frontendConfig.isEnterprise
       ? "Always cache field normalization values in memory for all fields by default."
-      : "Field normalization value caching is available in the Enterprise Edition.",
+      : "Field normalization value caching is available in Enterprise plans.",
   },
   fields: {
     label: "Fields",
@@ -184,7 +184,7 @@ export const invertedIndexFieldsMap = {
     group: "general",
     tooltip: window.frontendConfig.isEnterprise
       ? "Always cache primary key columns in memory."
-      : "Primary key column caching is available in the Enterprise Edition.",
+      : "Primary key column caching is available in Enterprise plans.",
   },
   storedValues: {
     label: "Stored Values",

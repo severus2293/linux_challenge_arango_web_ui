@@ -67,8 +67,8 @@ struct ThreadRegistry : std::enable_shared_from_this<ThreadRegistry> {
      Can only be called on the owning thread, crashes
      otherwise.
    */
-  auto add_promise(Requester requester, std::source_location location) noexcept
-      -> Promise*;
+  auto add_promise(std::source_location location =
+                       std::source_location::current()) noexcept -> Promise*;
 
   /**
      Executes a function on each promise in the registry that is not deleted yet
@@ -78,13 +78,13 @@ struct ThreadRegistry : std::enable_shared_from_this<ThreadRegistry> {
      items stay valid during iteration (i.e. are not deleted in the meantime).
    */
   template<typename F>
-  requires std::invocable<F, PromiseSnapshot>
+  requires std::invocable<F, Promise*>
   auto for_promise(F&& function) noexcept -> void {
     auto guard = std::lock_guard(mutex);
     // (2) - this load synchronizes with store in (1) and (3)
     for (auto current = promise_head.load(std::memory_order_acquire);
          current != nullptr; current = current->next) {
-      function(current->snapshot());
+      function(current);
     }
   }
 
@@ -112,7 +112,7 @@ struct ThreadRegistry : std::enable_shared_from_this<ThreadRegistry> {
    */
   auto garbage_collect_external() noexcept -> void;
 
-  ThreadId const thread;
+  Thread const thread;
 
  private:
   Registry* registry = nullptr;

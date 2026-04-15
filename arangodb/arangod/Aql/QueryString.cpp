@@ -29,10 +29,6 @@
 
 using namespace arangodb::aql;
 
-bool QueryString::equal(QueryString const& other) const noexcept {
-  return _hash == other._hash && _queryString == other._queryString;
-}
-
 void QueryString::append(std::string& out) const { out.append(_queryString); }
 
 std::string QueryString::extract(size_t maxLength) const {

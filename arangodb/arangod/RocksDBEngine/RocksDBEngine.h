@@ -547,8 +547,6 @@ class RocksDBEngine final : public StorageEngine, public ICompactKeyRange {
 
   [[noreturn]] void verifySstFiles(rocksdb::Options const& options) const;
 
-  [[nodiscard]] bool isVectorIndexEnabled() const;
-
 #ifdef USE_ENTERPRISE
   void collectEnterpriseOptions(std::shared_ptr<options::ProgramOptions>);
   void validateEnterpriseOptions(std::shared_ptr<options::ProgramOptions>);

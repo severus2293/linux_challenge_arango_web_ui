@@ -30,13 +30,11 @@
 #include "Aql/ExecutionNode/DistributeNode.h"
 #include "Aql/ExecutionNode/EnumerateCollectionNode.h"
 #include "Aql/ExecutionNode/EnumerateListNode.h"
-#include "Aql/ExecutionNode/EnumerateNearVectorNode.h"
 #include "Aql/ExecutionNode/EnumeratePathsNode.h"
 #include "Aql/ExecutionNode/FilterNode.h"
 #include "Aql/ExecutionNode/GatherNode.h"
 #include "Aql/ExecutionNode/IResearchViewNode.h"
 #include "Aql/ExecutionNode/IndexNode.h"
-#include "Aql/ExecutionNode/IndexCollectNode.h"
 #include "Aql/ExecutionNode/InsertNode.h"
 #include "Aql/ExecutionNode/JoinNode.h"
 #include "Aql/ExecutionNode/LimitNode.h"
@@ -83,13 +81,12 @@ using namespace arangodb::basics;
 namespace {
 
 /// @brief NodeType to string mapping
-frozen::unordered_map<int, std::string_view, 38> const kTypeNames{
+frozen::unordered_map<int, std::string_view, 36> const kTypeNames{
     {static_cast<int>(ExecutionNode::SINGLETON), "SingletonNode"},
     {static_cast<int>(ExecutionNode::ENUMERATE_COLLECTION),
      "EnumerateCollectionNode"},
     {static_cast<int>(ExecutionNode::ENUMERATE_LIST), "EnumerateListNode"},
     {static_cast<int>(ExecutionNode::INDEX), "IndexNode"},
-    {static_cast<int>(ExecutionNode::INDEX_COLLECT), "IndexCollectNode"},
     {static_cast<int>(ExecutionNode::LIMIT), "LimitNode"},
     {static_cast<int>(ExecutionNode::CALCULATION), "CalculationNode"},
     {static_cast<int>(ExecutionNode::SUBQUERY), "SubqueryNode"},
@@ -110,7 +107,7 @@ frozen::unordered_map<int, std::string_view, 38> const kTypeNames{
     {static_cast<int>(ExecutionNode::TRAVERSAL), "TraversalNode"},
     {static_cast<int>(ExecutionNode::SHORTEST_PATH), "ShortestPathNode"},
     {static_cast<int>(ExecutionNode::ENUMERATE_PATHS), "EnumeratePathsNode"},
-    {static_cast<int>(ExecutionNode::REMOTE_SINGLE),
+    {static_cast<int>(ExecutionNode::REMOTESINGLE),
      "SingleRemoteOperationNode"},
     {static_cast<int>(ExecutionNode::REMOTE_MULTIPLE),
      "MultipleRemoteModificationNode"},
@@ -127,8 +124,6 @@ frozen::unordered_map<int, std::string_view, 38> const kTypeNames{
     {static_cast<int>(ExecutionNode::OFFSET_INFO_MATERIALIZE),
      "OffsetMaterializeNode"},
     {static_cast<int>(ExecutionNode::JOIN), "JoinNode"},
-    {static_cast<int>(ExecutionNode::ENUMERATE_NEAR_VECTORS),
-     "EnumerateNearVectorNode"},
 };
 
 }  // namespace
@@ -376,8 +371,6 @@ ExecutionNode* ExecutionNode::fromVPackFactory(ExecutionPlan* plan,
       return new NoResultsNode(plan, slice);
     case INDEX:
       return new IndexNode(plan, slice);
-    case INDEX_COLLECT:
-      return new IndexCollectNode(plan, slice);
     case JOIN:
       return new JoinNode(plan, slice);
     case REMOTE:
@@ -397,7 +390,7 @@ ExecutionNode* ExecutionNode::fromVPackFactory(ExecutionPlan* plan,
       return new ShortestPathNode(plan, slice);
     case ENUMERATE_PATHS:
       return new EnumeratePathsNode(plan, slice);
-    case REMOTE_SINGLE:
+    case REMOTESINGLE:
       return new SingleRemoteOperationNode(plan, slice);
     case REMOTE_MULTIPLE:
       return new MultipleRemoteModificationNode(plan, slice);
@@ -448,11 +441,10 @@ ExecutionNode* ExecutionNode::fromVPackFactory(ExecutionPlan* plan,
       return new WindowNode(plan, slice, std::move(bounds), rangeVar,
                             aggregateVariables);
     }
-    case ENUMERATE_NEAR_VECTORS:
-      return new EnumerateNearVectorNode(plan, slice);
-    // should never reach this point
-    default:
+    default: {
+      // should not reach this point
       TRI_ASSERT(false);
+    }
   }
 
   THROW_ARANGO_EXCEPTION_MESSAGE(
@@ -964,7 +956,6 @@ void ExecutionNode::toVelocyPack(velocypack::Builder& builder,
   if (flags & ExecutionNode::SERIALIZE_PARENTS) {
     VPackArrayBuilder guard(&builder, "parents");
     for (auto const& it : _parents) {
-      TRI_ASSERT(it != nullptr);
       builder.add(VPackValue(it->id().id()));
     }
   }
@@ -1026,7 +1017,6 @@ void ExecutionNode::toVelocyPack(velocypack::Builder& builder,
       for (auto const& stackEntry : _varsValidStack) {
         VPackArrayBuilder stackEntryGuard(&builder);
         for (auto const& oneVar : stackEntry) {
-          TRI_ASSERT(oneVar != nullptr);
           oneVar->toVelocyPack(builder);
         }
       }
@@ -1034,8 +1024,7 @@ void ExecutionNode::toVelocyPack(velocypack::Builder& builder,
 
     if (flags & ExecutionNode::SERIALIZE_REGISTER_INFORMATION) {
       builder.add(VPackValue("unusedRegsStack"));
-      auto const& unusedRegsStack =
-          getRegisterPlan()->unusedRegsByNode.at(id());
+      auto const& unusedRegsStack = _registerPlan->unusedRegsByNode.at(id());
       {
         VPackArrayBuilder guard(&builder);
         TRI_ASSERT(!unusedRegsStack.empty());
@@ -1049,16 +1038,15 @@ void ExecutionNode::toVelocyPack(velocypack::Builder& builder,
       }
 
       builder.add(VPackValue("regVarMapStack"));
-      auto const& regVarMapStack =
-          getRegisterPlan()->regVarMapStackByNode.at(id());
+      auto const& regVarMapStack = _registerPlan->regVarMapStackByNode.at(id());
       {
         VPackArrayBuilder guard(&builder);
         TRI_ASSERT(!regVarMapStack.empty());
         for (auto const& stackEntry : regVarMapStack) {
           VPackObjectBuilder stackEntryGuard(&builder);
           for (auto const& reg : stackEntry) {
-            builder.add(VPackValue(std::to_string(reg.first.value())));
-            TRI_ASSERT(reg.second != nullptr);
+            using std::to_string;
+            builder.add(VPackValue(to_string(reg.first.value())));
             reg.second->toVelocyPack(builder);
           }
         }
@@ -1069,7 +1057,6 @@ void ExecutionNode::toVelocyPack(velocypack::Builder& builder,
         VPackArrayBuilder guard(&builder);
         auto const& varsSetHere = getVariablesSetHere();
         for (auto const& oneVar : varsSetHere) {
-          TRI_ASSERT(oneVar != nullptr);
           oneVar->toVelocyPack(builder);
         }
       }
@@ -1080,7 +1067,6 @@ void ExecutionNode::toVelocyPack(velocypack::Builder& builder,
         auto varsUsedHere = VarSet{};
         getVariablesUsedHere(varsUsedHere);
         for (auto const& oneVar : varsUsedHere) {
-          TRI_ASSERT(oneVar != nullptr);
           oneVar->toVelocyPack(builder);
         }
       }
@@ -1309,8 +1295,8 @@ RegisterCount ExecutionNode::getNrInputRegisters() const {
 
 auto ExecutionNode::getRegsToKeepStack() const -> RegIdSetStack {
   if (_regsToKeepStack.empty()) {
-    return getRegisterPlan()->calcRegsToKeep(
-        _varsUsedLaterStack, _varsValidStack, getVariablesSetHere());
+    return _registerPlan->calcRegsToKeep(_varsUsedLaterStack, _varsValidStack,
+                                         getVariablesSetHere());
   }
   return _regsToKeepStack;
 }
@@ -1365,7 +1351,6 @@ void ExecutionNode::removeRegistersGreaterThan(RegisterId maxRegister) {
     }
   };
 
-  TRI_ASSERT(_registerPlan != nullptr);
   auto it = _registerPlan->unusedRegsByNode.find(_id);
   if (it != _registerPlan->unusedRegsByNode.end()) {
     removeRegisters(it->second.back());
@@ -1562,7 +1547,6 @@ bool ExecutionNode::isIncreaseDepth(ExecutionNode::NodeType type) {
   switch (type) {
     case ENUMERATE_COLLECTION:
     case INDEX:
-    case INDEX_COLLECT:
     case ENUMERATE_LIST:
     case COLLECT:
 
@@ -1570,7 +1554,7 @@ bool ExecutionNode::isIncreaseDepth(ExecutionNode::NodeType type) {
     case SHORTEST_PATH:
     case ENUMERATE_PATHS:
 
-    case REMOTE_SINGLE:
+    case REMOTESINGLE:
     case ENUMERATE_IRESEARCH_VIEW:
     case MATERIALIZE:
 
@@ -1603,12 +1587,10 @@ bool ExecutionNode::alwaysCopiesRows(NodeType type) {
     case UPSERT:
     case TRAVERSAL:
     case INDEX:
-    case INDEX_COLLECT:
     case JOIN:
-    case ENUMERATE_NEAR_VECTORS:
     case SHORTEST_PATH:
     case ENUMERATE_PATHS:
-    case REMOTE_SINGLE:
+    case REMOTESINGLE:
     case REMOTE_MULTIPLE:
     case ENUMERATE_IRESEARCH_VIEW:
     case DISTRIBUTE_CONSUMER:

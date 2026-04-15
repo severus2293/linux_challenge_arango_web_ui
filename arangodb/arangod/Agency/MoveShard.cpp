@@ -586,7 +586,6 @@ bool MoveShard::start(bool&) {
       addMoveShardFromServerCanLock(pending);
       addPreconditionServerHealth(pending, _to,
                                   Supervision::HEALTH_STATUS_GOOD);
-      addPreconditionClonesStillExist(pending, _database, shardsLikeMe);
       addPreconditionUnchanged(pending, failedServersPrefix, failedServers);
       addPreconditionUnchanged(pending, cleanedPrefix, cleanedServers);
     }  // precondition done
@@ -912,7 +911,6 @@ JOB_STATUS MoveShard::pendingLeader() {
                          }
                        });
         addPreconditionCollectionStillThere(pre, _database, _collection);
-        addPreconditionClonesStillExist(pre, _database, shardsLikeMe);
         addIncreasePlanVersion(trx);
         if (failed) {
           return PENDING;
@@ -1016,7 +1014,6 @@ JOB_STATUS MoveShard::pendingLeader() {
           return PENDING;
         }
         addPreconditionCollectionStillThere(pre, _database, _collection);
-        addPreconditionClonesStillExist(pre, _database, shardsLikeMe);
         addPreconditionCurrentReplicaShardGroup(pre, _database, shardsLikeMe,
                                                 _to);
         addIncreasePlanVersion(trx);
@@ -1122,7 +1119,6 @@ JOB_STATUS MoveShard::pendingLeader() {
           addIncreasePlanVersion(trx);
         }
         addPreconditionCollectionStillThere(pre, _database, _collection);
-        addPreconditionClonesStillExist(pre, _database, shardsLikeMe);
         addRemoveJobFromSomewhere(trx, "Pending", _jobId);
         Builder job;
         std::ignore = _snapshot.hasAsBuilder(pendingPrefix + _jobId, job);
@@ -1249,7 +1245,6 @@ JOB_STATUS MoveShard::pendingFollower() {
       std::ignore = _snapshot.hasAsBuilder(pendingPrefix + _jobId, job);
       addPutJobIntoSomewhere(trx, "Finished", job.slice(), "");
       addPreconditionCollectionStillThere(precondition, _database, _collection);
-      addPreconditionClonesStillExist(precondition, _database, shardsLikeMe);
       addReleaseShard(trx, _shard);
       addMoveShardToServerUnLock(trx);
       addMoveShardFromServerUnLock(trx);
@@ -1430,7 +1425,6 @@ arangodb::Result MoveShard::abort(std::string const& reason) {
       // If the collection is gone in the meantime, we do nothing here, but
       // the round will move the job to Finished anyway:
       addPreconditionCollectionStillThere(trx, _database, _collection);
-      addPreconditionClonesStillExist(trx, _database, shardsLikeMe);
     }
   }
 

@@ -1,7 +1,9 @@
-import { ReactTable, TableControl, useSortableReactTable } from "@arangodb/ui";
 import { Stack } from "@chakra-ui/react";
 import { createColumnHelper } from "@tanstack/react-table";
 import React from "react";
+import { ReactTable } from "../../../components/table/ReactTable";
+import { TableControl } from "../../../components/table/TableControl";
+import { useSortableReactTable } from "../../../components/table/useSortableReactTable";
 import { DatabaseUserValues } from "../addUser/CreateUser.types";
 import { useUsersContext } from "../UsersContext";
 import { AvatarCell, LinkCell, StatusCell } from "./UserTableCells";
@@ -64,7 +66,10 @@ export const UsersTable = () => {
   return (
     <>
       <Stack>
-        <TableControl<DatabaseUserValues> table={tableInstance} />
+        <TableControl<DatabaseUserValues>
+          table={tableInstance}
+          columns={TABLE_COLUMNS}
+        />
         <ReactTable<DatabaseUserValues>
           table={tableInstance}
           emptyStateMessage="No users found"

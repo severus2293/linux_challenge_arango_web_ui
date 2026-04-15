@@ -21,11 +21,9 @@
 /// @author Andrey Abramov
 /// @author Vasiliy Nabatchikov
 ////////////////////////////////////////////////////////////////////////////////
-
 #include "ApplicationFeatures/ApplicationServer.h"
 #include "Aql/AstNode.h"
 #include "Aql/QueryCache.h"
-#include "Aql/QueryPlanCache.h"
 #include "Basics/DownCast.h"
 #include "Basics/StaticStrings.h"
 #include "Basics/VelocyPackHelper.h"
@@ -536,7 +534,6 @@ Result IResearchView::properties(velocypack::Slice slice, bool isUserRequest,
   if (!r.ok()) {
     return r;
   }
-  vocbase().queryPlanCache().invalidateAll();
   aql::QueryCache::instance()->invalidate(&vocbase());
   if (ServerState::instance()->isSingleServer()) {
     return storage_helper::properties(*this, false);

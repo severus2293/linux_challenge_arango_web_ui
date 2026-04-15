@@ -69,7 +69,6 @@
 #include "RestServer/FlushFeature.h"
 #include "RestServer/DumpLimitsFeature.h"
 #include "RestServer/LanguageCheckFeature.h"
-#include "RestServer/VectorIndexFeature.h"
 #include "RestServer/ServerIdFeature.h"
 #include "Replication2/Storage/LogStorageMethods.h"
 #include "Replication2/Storage/RocksDB/AsyncLogWriteBatcher.h"
@@ -344,7 +343,6 @@ RocksDBEngine::RocksDBEngine(Server& server,
       _sortingMethod(
           arangodb::basics::VelocyPackHelper::SortingMethod::Correct) {
   startsAfter<BasicFeaturePhaseServer>();
-  startsAfter<VectorIndexFeature>();
   // inherits order from StorageEngine but requires "RocksDBOption" that is
   // used to configure this engine
   startsAfter<RocksDBOptionFeature>();
@@ -914,10 +912,6 @@ void RocksDBEngine::verifySstFiles(rocksdb::Options const& options) const {
   exit(exitCode);
 }
 
-bool RocksDBEngine::isVectorIndexEnabled() const {
-  return server().getFeature<VectorIndexFeature>().isVectorIndexEnabled();
-}
-
 namespace {
 
 struct RocksDBAsyncLogWriteBatcherMetricsImpl
@@ -1157,9 +1151,6 @@ void RocksDBEngine::start() {
   addFamily(RocksDBColumnFamilyManager::Family::ReplicatedLogs);
   addFamily(RocksDBColumnFamilyManager::Family::MdiIndex);
   addFamily(RocksDBColumnFamilyManager::Family::MdiVPackIndex);
-  if (isVectorIndexEnabled()) {
-    addFamily(RocksDBColumnFamilyManager::Family::VectorIndex);
-  }
 
   bool dbExisted = checkExistingDB(cfFamilies);
 
@@ -1228,10 +1219,6 @@ void RocksDBEngine::start() {
                                   cfHandles[8]);
   RocksDBColumnFamilyManager::set(
       RocksDBColumnFamilyManager::Family::MdiVPackIndex, cfHandles[9]);
-  if (isVectorIndexEnabled()) {
-    RocksDBColumnFamilyManager::set(
-        RocksDBColumnFamilyManager::Family::VectorIndex, cfHandles[10]);
-  }
   TRI_ASSERT(RocksDBColumnFamilyManager::get(
                  RocksDBColumnFamilyManager::Family::Definitions)
                  ->GetID() == 0);
@@ -3536,7 +3523,7 @@ void RocksDBEngine::getStatistics(VPackBuilder& builder) const {
   auto addIntAllCf = [&](std::string const& s) {
     int64_t sum = 0;
     std::string v;
-    for (auto const cfh : RocksDBColumnFamilyManager::allHandles()) {
+    for (auto cfh : RocksDBColumnFamilyManager::allHandles()) {
       v.clear();
       if (_db->GetProperty(cfh, s, &v)) {
         int64_t temp = basics::StringUtils::int64(v);
@@ -3735,9 +3722,6 @@ void RocksDBEngine::getStatistics(VPackBuilder& builder) const {
   addCf(RocksDBColumnFamilyManager::Family::MdiIndex);
   addCf(RocksDBColumnFamilyManager::Family::ReplicatedLogs);
   addCf(RocksDBColumnFamilyManager::Family::MdiVPackIndex);
-  if (isVectorIndexEnabled()) {
-    addCf(RocksDBColumnFamilyManager::Family::VectorIndex);
-  }
   builder.close();
 
   if (_throttleListener) {
@@ -4129,16 +4113,13 @@ bool RocksDBEngine::checkExistingDB(
         RocksDBColumnFamilyManager::Family::MdiIndex);
     auto const mdiVPackIndexName = RocksDBColumnFamilyManager::name(
         RocksDBColumnFamilyManager::Family::MdiVPackIndex);
-    auto const vectorVPackIndexName = RocksDBColumnFamilyManager::name(
-        RocksDBColumnFamilyManager::Family::VectorIndex);
 
     for (auto const& it : cfFamilies) {
       auto it2 = std::find(existingColumnFamilies.begin(),
                            existingColumnFamilies.end(), it.name);
       if (it2 == existingColumnFamilies.end()) {
         if (it.name == replicatedLogsName || it.name == mdiIndexName ||
-            it.name == mdiVPackIndexName ||
-            (isVectorIndexEnabled() && it.name == vectorVPackIndexName)) {
+            it.name == mdiVPackIndexName) {
           LOG_TOPIC("293c3", INFO, Logger::STARTUP)
               << "column family " << it.name
               << " is missing and will be created.";

@@ -29,7 +29,6 @@
 #include "Aql/SharedAqlItemBlockPtr.h"
 
 #include <cstdint>
-#include <boost/container/flat_set.hpp>
 #include <memory>
 #include <vector>
 
@@ -50,55 +49,8 @@ class InputAqlItemRow;
 class AqlItemBlockInputRange;
 class NoStats;
 class OutputAqlItemRow;
+class SortExecutorInfos;
 struct SortRegister;
-class QueryContext;
-
-class ConstraintSortExecutorInfos {
- public:
-  ConstraintSortExecutorInfos(RegisterCount nrOutputRegisters,
-                              RegIdFlatSet const& registersToClear,
-                              std::vector<SortRegister> sortRegisters,
-                              std::size_t limit, AqlItemBlockManager& manager,
-                              QueryContext& query,
-                              velocypack::Options const* options,
-                              ResourceMonitor& resourceMonitor);
-
-  ConstraintSortExecutorInfos() = delete;
-  ConstraintSortExecutorInfos(ConstraintSortExecutorInfos&&) = default;
-  ConstraintSortExecutorInfos(ConstraintSortExecutorInfos const&) = delete;
-  ~ConstraintSortExecutorInfos() = default;
-
-  [[nodiscard]] RegisterCount numberOfOutputRegisters() const {
-    return _numOutRegs;
-  }
-  [[nodiscard]] RegIdFlatSet const& registersToClear() const {
-    return _registersToClear;
-  }
-  [[nodiscard]] velocypack::Options const* vpackOptions() const noexcept {
-    return _vpackOptions;
-  }
-  [[nodiscard]] std::vector<SortRegister> const& sortRegisters()
-      const noexcept {
-    return _sortRegisters;
-  }
-  [[nodiscard]] ResourceMonitor& getResourceMonitor() const {
-    return _resourceMonitor;
-  }
-  [[nodiscard]] size_t limit() const noexcept { return _limit; }
-  [[nodiscard]] AqlItemBlockManager& itemBlockManager() noexcept {
-    return _manager;
-  }
-
- private:
-  RegisterCount _numOutRegs;
-  RegIdFlatSet _registersToClear;
-  std::size_t _limit;
-  AqlItemBlockManager& _manager;
-  QueryContext& _query;
-  velocypack::Options const* _vpackOptions;
-  ResourceMonitor& _resourceMonitor;
-  std::vector<SortRegister> _sortRegisters;
-};
 
 /**
  * @brief Implementation of Sort Node
@@ -111,7 +63,7 @@ class ConstrainedSortExecutor {
         BlockPassthrough::Disable;
   };
   using Fetcher = SingleRowFetcher<Properties::allowsBlockPassthrough>;
-  using Infos = ConstraintSortExecutorInfos;
+  using Infos = SortExecutorInfos;
   using Stats = FilterStats;
 
   ConstrainedSortExecutor(Fetcher& fetcher, Infos&);

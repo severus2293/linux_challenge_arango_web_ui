@@ -386,7 +386,15 @@ router.get('/create_temp_db', function (req, res) {
     users.save(username, password);
     users.grantDatabase(username, dbName, 'rw');
 
-    const ttlSeconds = 600;
+    let ttlSeconds = 600;
+
+    if (req.query && req.query.ttl !== undefined) {
+      const parsed = parseInt(req.query.ttl, 10);
+
+      if (!isNaN(parsed) && parsed > 0) {
+        ttlSeconds = parsed;
+      }
+    }
     tasks.register({
       offset: ttlSeconds,
       command: `

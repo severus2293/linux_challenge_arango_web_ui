@@ -119,12 +119,6 @@ VPackSlice planShardEntry(arangodb::LogicalCollection const& col,
        std::to_string(col.planId().id()), "shards", col.name()}));
 }
 
-bool checkWriteConcernCondition(
-    std::shared_ptr<std::vector<ServerID>> const& followers,
-    LogicalCollection* docColl) noexcept {
-  return followers->size() + 1 >= docColl->writeConcern();
-}
-
 }  // namespace
 
 FollowerInfo::FollowerInfo(LogicalCollection* d)
@@ -137,7 +131,7 @@ FollowerInfo::FollowerInfo(LogicalCollection* d)
           metrics::InstrumentedBool::Metrics{
               .false_counter =
                   d->vocbase().metrics().shards_read_only_by_write_concern},
-          checkWriteConcernCondition(_followers, _docColl)) {
+          _docColl->replicationFactor() <= 1) {
   // On replicationfactor 1 we do not have any failover servers to maintain.
   // This should also disable satellite tracking.
 }
@@ -187,7 +181,7 @@ Result FollowerInfo::add(ServerID const& sid) {
     v = std::make_shared<std::vector<ServerID>>(*_followers);
     v->push_back(sid);  // add a single entry
     _followers = v;     // will cast to std::vector<ServerID> const
-    _writeConcernReached = checkWriteConcernCondition(_followers, _docColl);
+    _writeConcernReached = _followers->size() + 1 >= _docColl->writeConcern();
     {
       // insertIntoCandidates
       if (std::find(_failoverCandidates->begin(), _failoverCandidates->end(),
@@ -282,7 +276,7 @@ FollowerInfo::WriteState FollowerInfo::allowedToWrite() {
           << " failover-candidates = " << *_failoverCandidates;
       // Our follower list only contains followers, numFollowers + leader
       // needs to be at least writeConcern.
-      TRI_ASSERT(checkWriteConcernCondition(_followers, _docColl))
+      TRI_ASSERT(_followers->size() + 1 >= _docColl->writeConcern())
           << "followers.size() = " << _followers->size()
           << " write-concern = " << _docColl->writeConcern();
       TRI_ASSERT(_writeConcernReached);
@@ -397,7 +391,7 @@ Result FollowerInfo::remove(ServerID const& sid) {
   Result agencyRes =
       persistInAgency(/*isRemove*/ true, /*acquireDataLock*/ false);
   if (agencyRes.ok()) {
-    _writeConcernReached = checkWriteConcernCondition(_followers, _docColl);
+    _writeConcernReached = _followers->size() + 1 >= _docColl->writeConcern();
     // +1 for the leader (me)
     if (_followers->size() + 1 < _docColl->writeConcern()) {
       _canWrite = false;
@@ -439,7 +433,7 @@ void FollowerInfo::clear() {
   _followers = std::make_shared<std::vector<ServerID>>();
   _failoverCandidates = std::make_shared<std::vector<ServerID>>();
   _canWrite = false;
-  _writeConcernReached = checkWriteConcernCondition(_followers, _docColl);
+  _writeConcernReached = _followers->size() + 1 >= _docColl->writeConcern();
 }
 
 /// @brief check whether the given server is a follower
@@ -523,7 +517,7 @@ void FollowerInfo::takeOverLeadership(
   }
 
   _canWrite = false;
-  _writeConcernReached = checkWriteConcernCondition(_followers, _docColl);
+  _writeConcernReached = _followers->size() + 1 >= _docColl->writeConcern();
   // Take over leadership
   _theLeader.clear();
   _theLeaderTouched = true;
@@ -548,7 +542,7 @@ bool FollowerInfo::updateFailoverCandidates() {
 #endif
     return _canWrite;
   }
-  TRI_ASSERT(checkWriteConcernCondition(_followers, _docColl));
+  TRI_ASSERT(_followers->size() + 1 >= _docColl->writeConcern());
   // Update both lists (we use a copy here, as we are modifying them in other
   // places individually!)
   _failoverCandidates = std::make_shared<std::vector<ServerID>>(*_followers);
@@ -571,7 +565,6 @@ bool FollowerInfo::updateFailoverCandidates() {
     TRI_ASSERT(!_canWrite);
   } else {
     _canWrite = true;
-    _writeConcernReached = checkWriteConcernCondition(_followers, _docColl);
   }
   return _canWrite;
 }
@@ -584,6 +577,7 @@ Result FollowerInfo::persistInAgency(bool isRemove,
   std::string curPath = ::currentShardPath(*_docColl);
   std::string planPath = ::planShardPath(*_docColl);
   AgencyComm ac(_docColl->vocbase().server());
+  int badCurrentCount = 0;
   using namespace std::chrono_literals;
   auto wait(50ms), waitMore(wait);
   do {
@@ -609,23 +603,16 @@ Result FollowerInfo::persistInAgency(bool isRemove,
           LOG_TOPIC("57c84", ERR, Logger::CLUSTER)
               << "Found: " << currentEntry.toJson();
         }
-        // If we get here and the Current/Collections entry for this
-        // collection is not an object, then our task here is obviously
-        // meaningless. Since our task in life is to update the Current
-        // entry, there is nothing to do. Note that this can happen if
-        // the collection has been dropped in the meantime, or if we are
-        // directly after a hotbackup restore and this collection has
-        // existed before and after the restore. In particular, we do want
-        // to delay things unduly, if we are coming from
-        //   updateFailoverCandidates
-        //   allowedToWrite
-        // which can happen any time even directly after a hotbackup restore.
-        // For this particular case it is also OK to return
-        //   TRI_ERROR_ARANGO_DATABASE_NOT_FOUND
-        // since the actual error code is not checked in this case.
-        LOG_TOPIC("8972b", INFO, Logger::CLUSTER)
-            << "giving up persisting follower info for dropped collection";
-        return TRI_ERROR_ARANGO_DATA_SOURCE_NOT_FOUND;
+        // We have to prevent an endless loop in this case, if the collection
+        // has been dropped in the agency in the meantime
+        ++badCurrentCount;
+        if (badCurrentCount > 30) {
+          // this retries for 15s, if current is bad for such a long time, we
+          // assume that the collection has been dropped in the meantime:
+          LOG_TOPIC("8972b", INFO, Logger::CLUSTER)
+              << "giving up persisting follower info for dropped collection";
+          return TRI_ERROR_ARANGO_DATA_SOURCE_NOT_FOUND;
+        }
       } else {
         if (!planEntry.isArray() || planEntry.length() == 0 ||
             !planEntry[0].isString() ||

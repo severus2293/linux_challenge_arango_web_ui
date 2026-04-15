@@ -147,8 +147,7 @@ Result LogicalDataSource::properties(velocypack::Builder& build,
   // however, for our purposes this is an okay mapping;
   // we only set includeSystem if we are persisting the properties
   if (ctx == Serialization::Persistence ||
-      ctx == Serialization::PersistenceWithInProgress ||
-      ctx == Serialization::Maintenance) {
+      ctx == Serialization::PersistenceWithInProgress) {
     build.add(StaticStrings::DataSourceDeleted, velocypack::Value(deleted()));
     build.add(StaticStrings::DataSourceSystem, velocypack::Value(system()));
     // TODO not sure if the following is relevant

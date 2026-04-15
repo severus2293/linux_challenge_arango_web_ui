@@ -56,7 +56,7 @@ function recoverySuite () {
 
     testDropIndexShutdown: function () {
       var c = db._collection('UnitTestsRecovery');
-      var idx = c.indexes();
+      var idx = c.getIndexes();
       assertEqual(1, idx.length);
       assertEqual('primary', idx[0].type);
     }

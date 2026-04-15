@@ -30,7 +30,6 @@
 #include "Agency/TransactionBuilder.h"
 #include "Agency/Supervision.h"
 #include "ApplicationFeatures/ApplicationServer.h"
-#include "Aql/QueryPlanCache.h"
 #include "Basics/Exceptions.h"
 #include "Basics/FeatureFlags.h"
 #include "Basics/GlobalResourceMonitor.h"
@@ -397,26 +396,19 @@ class ClusterInfo::SyncerThread final
   void run() override;
   bool start();
   void sendNews() noexcept;
+  void waitForNews() noexcept;
 
  private:
   auto call() noexcept -> std::optional<consensus::index_t>;
   futures::Future<futures::Unit> fetchUpdates();
-  class Synchronization {
-   public:
-    void sendNews() noexcept;
-    void waitForNews() noexcept;
 
-   private:
-    std::mutex _m;
-    std::condition_variable _cv;
-    bool _news;
-  };
+  std::mutex _m;
+  std::condition_variable _cv;
+  bool _news;
 
   std::string _section;
   std::function<consensus::index_t()> _f;
   AgencyCache& _agencyCache;
-  std::shared_ptr<Synchronization> _synchronization =
-      std::make_shared<Synchronization>();
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -938,23 +930,26 @@ auto ClusterInfo::loadPlan() -> consensus::index_t {
     if (changeSet.rest != nullptr) {  // Rest
       newPlan[std::string_view{}] = changeSet.rest;
     }
+  }
 
-    // For ArangoSearch views we need to get access to immediately created views
-    // in order to allow links to be created correctly.
-    // For the scenario above, we track such views in '_newPlannedViews' member
-    // which is supposed to be empty before and after 'ClusterInfo::loadPlan()'
-    // execution. In addition, we do the following "trick" to provide access to
-    // '_newPlannedViews' from outside 'ClusterInfo': in case if
-    // 'ClusterInfo::getView' has been called from within
-    // 'ClusterInfo::loadPlan', we redirect caller to search view in
-    // '_newPlannedViews' member instead of '_plannedViews'
+  // For ArangoSearch views we need to get access to immediately created views
+  // in order to allow links to be created correctly.
+  // For the scenario above, we track such views in '_newPlannedViews' member
+  // which is supposed to be empty before and after 'ClusterInfo::loadPlan()'
+  // execution. In addition, we do the following "trick" to provide access to
+  // '_newPlannedViews' from outside 'ClusterInfo': in case if
+  // 'ClusterInfo::getView' has been called from within 'ClusterInfo::loadPlan',
+  // we redirect caller to search view in
+  // '_newPlannedViews' member instead of '_plannedViews'
 
+  // set plan loader
+  {
+    READ_LOCKER(guard, _planProt.lock);
     // Create a copy, since we might not visit all databases
     _newPlannedViews = _plannedViews;
     _newPlannedCollections = _plannedCollections;
-    _currentCleanups.clear();
-    // set plan loader
     _planLoader = std::this_thread::get_id();
+    _currentCleanups.clear();
   }
 
   // ensure we'll eventually reset plan loader
@@ -1049,8 +1044,8 @@ auto ClusterInfo::loadPlan() -> consensus::index_t {
             AgencyCommHelper::path(), "Plan", "Collections", name};
         if (plan->slice()[0].hasKey(colPath)) {
           for (auto col : VPackObjectIterator(plan->slice()[0].get(colPath))) {
-            if (auto shards = col.value.get("shards"); shards.isObject()) {
-              for (auto shard : VPackObjectIterator(shards)) {
+            if (col.value.hasKey("shards")) {
+              for (auto shard : VPackObjectIterator(col.value.get("shards"))) {
                 auto const& shardName = shard.key.copyString();
                 ShardID shardID{shardName};
                 newShards.erase(shardName);
@@ -1192,8 +1187,9 @@ auto ClusterInfo::loadPlan() -> consensus::index_t {
         continue;
       }
 
-      for (auto viewPairSlice : velocypack::ObjectIterator(viewsSlice, true)) {
-        auto viewSlice = viewPairSlice.value;
+      for (auto const& viewPairSlice :
+           velocypack::ObjectIterator(viewsSlice, true)) {
+        auto const& viewSlice = viewPairSlice.value;
 
         if (!viewSlice.isObject()) {
           LOG_TOPIC("2487b", INFO, Logger::AGENCY)
@@ -1301,6 +1297,7 @@ auto ClusterInfo::loadPlan() -> consensus::index_t {
       // cannot find vocbase for defined analyzers (allow empty analyzers for
       // missing vocbase)
       planValid &= !analyzerSlice.length();
+
       continue;
     }
 
@@ -1498,11 +1495,6 @@ auto ClusterInfo::loadPlan() -> consensus::index_t {
       // (allow empty collections for missing vocbase)
       planValid &= !collectionsSlice.length();
       continue;
-    }
-
-    if (ServerState::instance()->isCoordinator()) {
-      // invalidate query plan caches for every changed database.
-      vocbase->queryPlanCache().invalidateAll();
     }
 
     auto databaseCollections = allocateShared<DatabaseCollections>();
@@ -5849,10 +5841,6 @@ auto ClusterInfo::SyncerThread::call() noexcept
 }
 
 void ClusterInfo::SyncerThread::sendNews() noexcept {
-  _synchronization->sendNews();
-}
-
-void ClusterInfo::SyncerThread::Synchronization::sendNews() noexcept {
   {
     std::lock_guard lk(_m);
     _news = true;
@@ -5860,7 +5848,7 @@ void ClusterInfo::SyncerThread::Synchronization::sendNews() noexcept {
   _cv.notify_one();
 }
 
-void ClusterInfo::SyncerThread::Synchronization::waitForNews() noexcept {
+void ClusterInfo::SyncerThread::waitForNews() noexcept {
   {
     std::unique_lock lk(_m);
     _cv.wait(lk, [&] { return _news; });
@@ -5869,15 +5857,13 @@ void ClusterInfo::SyncerThread::Synchronization::waitForNews() noexcept {
 }
 
 void ClusterInfo::SyncerThread::run() {
-  auto const sendNewsCb = [sync = _synchronization](auto&&) noexcept {
-    sync->sendNews();
-  };
+  auto const sendNewsCb = [this](auto&&) noexcept { sendNews(); };
 
   for (auto nextIndex = consensus::index_t{1}; !isStopping(); ++nextIndex) {
     _agencyCache.waitFor(nextIndex, AgencyCache::Executor::Direct)
         .thenFinal(sendNewsCb);
 
-    _synchronization->waitForNews();
+    waitForNews();
 
     // We update on every change; our _f (loadPlan/loadCurrent) decide for
     // themselves whether they need to do a real update. This way they can at

@@ -73,14 +73,6 @@ let PORTMANAGER;
 
 const seconds = x => x * 1000;
 
-const unInteristingLogTopics = [
-  "de8f3",
-  "e8b68",
-  "1afb1",
-  "d72fb",
-  "f3108",
-];
-
 function getSockStatFile(pid) {
   try {
     return fs.read("/proc/" + pid + "/net/sockstat");
@@ -98,7 +90,6 @@ const instanceRole = {
   single: 'single',
   agent: 'agent',
   dbServer: 'dbserver',
-  dbserver: 'dbserver',
   coordinator: 'coordinator',
 };
 
@@ -106,12 +97,12 @@ class instance {
   #pid = null;
 
   // / protocol must be one of ["tcp", "ssl", "unix"]
-  constructor(options, myInstanceRole, addArgs, authHeaders, protocol, rootDir, restKeyFile, agencyMgr, tmpDir, mem) {
+  constructor(options, instanceRole, addArgs, authHeaders, protocol, rootDir, restKeyFile, agencyMgr, tmpDir, mem) {
     this.id = null;
     this.shortName = null;
     this.pm = pm.getPortManager(options);
     this.options = options;
-    this.instanceRole = myInstanceRole;
+    this.instanceRole = instanceRole;
     this.rootDir = rootDir;
     this.protocol = protocol;
 
@@ -120,8 +111,7 @@ class instance {
     for (const [key, value] of Object.entries(addArgs)) {
       if (key.search('extraArgs') >= 0) {
         let splitkey = key.split('.');
-        if (splitkey.length > 3 &&
-            instanceRole.hasOwnProperty(splitkey[1])) {
+        if (splitkey.length !== 2) {
           if (splitkey[1] === this.instanceRole) {
             this.args[splitkey.slice(2).join('.')] = value;
           }
@@ -167,7 +157,7 @@ class instance {
 
     this._makeArgsArangod();
 
-    this.name = this.instanceRole + ' - ' + this.port;
+    this.name = instanceRole + ' - ' + this.port;
     this.exitStatus = null;
     this.serverCrashedLocal = false;
     this.netstat = {'in':{}, 'out': {}};
@@ -370,10 +360,10 @@ class instance {
     if (this.options.hasOwnProperty("replicationVersion")) {
       this.args['database.default-replication-version'] = this.options.replicationVersion;
     }
+
     for (const [key, value] of Object.entries(this.options.extraArgs)) {
       let splitkey = key.split('.');
-      if (splitkey.length >= 2 &&
-          instanceRole.hasOwnProperty(splitkey[0])) {
+      if (splitkey.length !== 2) {
         if (splitkey[0] === this.instanceRole) {
           this.args[splitkey.slice(1).join('.')] = value;
         }
@@ -381,6 +371,7 @@ class instance {
         this.args[key] = value;
       }
     }
+
     let output = this.args.hasOwnProperty('log.output') ? this.args['log.output'] : [];
     if (typeof output === 'string') {
       output = [output];
@@ -1138,7 +1129,7 @@ class instance {
   // //////////////////////////////////////////////////////////////////////////////
   // / @brief scans the log files for assert lines
   // //////////////////////////////////////////////////////////////////////////////
-  readImportantLogLines () {
+  readImportantLogLines (logPath) {
     let fnLines = [];
     const buf = fs.readBuffer(fs.join(this.logFile));
     let lineStart = 0;
@@ -1152,19 +1143,11 @@ class instance {
         // filter out regular INFO lines, and test related messages
         let warn = line.search('WARNING about to execute:') !== -1;
         let info = line.search(' INFO ') !== -1;
-        let crash = line.search('{crash}') !== -1;
-        if (warn || (info && ! crash)) {
+
+        if (warn || info) {
           continue;
         }
-        let foundUninteresting = false;
-        unInteristingLogTopics.forEach(logToken => {
-          if (line.search(logToken) !== -1) {
-            foundUninteresting = true;
-          }
-        });
-        if (!foundUninteresting) {
-          fnLines.push(line);
-        }
+        fnLines.push(line);
       }
     }
     return fnLines;
@@ -1523,9 +1506,6 @@ class instance {
         throw new Error(`Failed to crash ${this.name}: ${ex}`);
       }
       if (reply.code !== 200) {
-        if (reply === undefined) {
-          reply = { parsedBody: "thrown during connect"};
-        }
         throw new Error(`Failed to crash ${this.name}: ${reply.parsedBody}`);
       }
     }

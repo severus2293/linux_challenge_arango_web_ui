@@ -37,5 +37,4 @@ extern Registry registry;
  */
 auto get_thread_registry() noexcept -> ThreadRegistry&;
 
-auto get_current_coroutine() noexcept -> Requester*;
 }  // namespace arangodb::async_registry

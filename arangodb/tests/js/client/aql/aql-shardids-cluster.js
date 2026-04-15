@@ -147,7 +147,7 @@ function ahuacatlShardIdsOptimizationTestSuite() {
   };
 
   const dropIndexes = (col) => {
-    let indexes = col.indexes();
+    let indexes = col.getIndexes();
     for (const idx of indexes) {
       if (idx.type !== "primary" && idx.type !== "edge") {
         col.dropIndex(idx.id);

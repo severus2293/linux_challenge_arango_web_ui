@@ -10,9 +10,7 @@ target_include_directories(arango_metrics_base PRIVATE
 target_link_libraries(arango_metrics_base
   PUBLIC
   absl::strings
-  arango_basic_errors
-  arango_basic_utils
-)
+  arango_lightweight)
 
 add_library(arango_metrics STATIC
   MetricsFeature.cpp

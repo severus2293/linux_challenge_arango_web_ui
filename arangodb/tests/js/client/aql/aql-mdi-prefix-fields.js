@@ -374,6 +374,7 @@ function optimizerRuleMdiTraversal() {
 
       const res = db._createStatement(query).explain();
       const traversalNodes = res.plan.nodes.filter(n => n.type === "TraversalNode");
+      db._explain(query);
       traversalNodes.forEach(function (node) {
         node.indexes.base.forEach(function (idx) {
           assertEqual(idx.name, sparseIndexName, node.indexes);

@@ -90,15 +90,6 @@ struct VPackLoadInspectorImpl
     }
   }
 
-  [[nodiscard]] Status value(float& v) {
-    try {
-      v = _slice.getNumber<float>();
-      return {};
-    } catch (velocypack::Exception& e) {
-      return {e.what()};
-    }
-  }
-
   [[nodiscard]] Status value(std::string& v) {
     if (!_slice.isString()) {
       return {"Expecting type String"};

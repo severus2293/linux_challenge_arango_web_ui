@@ -348,7 +348,6 @@ function assertIsProfilePlanObject (plan) {
     'estimatedCost',
     'estimatedNrItems',
     'isModificationQuery',
-    'asyncPrefetchNodes',
   ]);
 
   expect(plan.nodes).to.be.an('array');

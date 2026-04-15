@@ -1,8 +1,10 @@
-import { ReactTable, TableControl, useSortableReactTable } from "@arangodb/ui";
 import { Link, Stack } from "@chakra-ui/react";
 import { createColumnHelper } from "@tanstack/react-table";
 import React from "react";
 import { Link as RouterLink, useHistory } from "react-router-dom";
+import { ReactTable } from "../../../components/table/ReactTable";
+import { TableControl } from "../../../components/table/TableControl";
+import { useSortableReactTable } from "../../../components/table/useSortableReactTable";
 import { DatabaseDescription } from "../Database.types";
 import { useDatabasesContext } from "../DatabasesContext";
 
@@ -52,6 +54,7 @@ export const DatabasesTable = () => {
   return (
     <Stack>
       <TableControl<DatabaseDescription>
+        columns={TABLE_COLUMNS}
         table={tableInstance}
         showColumnSelector={false}
       />

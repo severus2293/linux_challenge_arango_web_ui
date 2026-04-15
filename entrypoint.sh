@@ -20,17 +20,15 @@ if [ -d /sys/devices/system/node/node1 -a -f /proc/self/numa_maps ]; then
     fi
 fi
 
-# Подготовка конфигурации
 cp /etc/arangodb3/arangod.conf /tmp/arangod.conf
 
-if [ ! -z "$ARANGO_ENCRYPTION_KEYFILE" ]; then
+if [ -n "$ARANGO_ENCRYPTION_KEYFILE" ]; then
     echo "Using encrypted database"
     sed -i /tmp/arangod.conf -e "s;^.*encryption-keyfile.*;encryption-keyfile=$ARANGO_ENCRYPTION_KEYFILE;"
 fi
 
 ln -sf /usr/local/share/arangodb3/js /usr/local/js
 
-# Инициализация БД при первом запуске
 if [ ! -f /var/lib/arangodb3/SERVER ] && [ "$SKIP_DATABASE_INIT" != "1" ]; then
     if [ -n "$ARANGO_RANDOM_ROOT_PASSWORD" ]; then
         ARANGO_ROOT_PASSWORD="$(pwgen -s -1 16)"
@@ -55,10 +53,12 @@ if [ ! -f /var/lib/arangodb3/SERVER ] && [ "$SKIP_DATABASE_INIT" != "1" ]; then
         --rocksdb.block-cache-size="$ARANGO_CACHE" \
         --rocksdb.total-write-buffer-size="$ARANGO_CACHE" \
         --rocksdb.enforce-block-cache-size-limit=true \
-        --log.file /tmp/init-log \
-        --log.foreground-tty false &
+        --log.output - \
+        --log.foreground-tty true \
+        &
 
     pid="$!"
+
     for i in {1..60}; do
         sleep 1
         if arangosh \
@@ -67,9 +67,9 @@ if [ ! -f /var/lib/arangodb3/SERVER ] && [ "$SKIP_DATABASE_INIT" != "1" ]; then
             --javascript.execute-string "db._version()" &>/dev/null; then
             break
         fi
+
         if ! kill -0 "$pid" 2>/dev/null; then
             echo "ArangoDB failed to start during init"
-            cat /tmp/init-log || true
             exit 1
         fi
     done
@@ -82,19 +82,25 @@ if [ ! -f /var/lib/arangodb3/SERVER ] && [ "$SKIP_DATABASE_INIT" != "1" ]; then
             --javascript.execute-string "require('@arangodb/users').replace('root', '$ARANGO_ROOT_PASSWORD');"
     fi
 
-    # Скрипты и дампы
     for f in /docker-entrypoint-initdb.d/*; do
         case "$f" in
-            *.sh) echo "Running $f"; . "$f" ;;
-            *.js) echo "Running $f"; arangosh \
-                --server.endpoint=tcp://127.0.0.1:$ARANGO_INIT_PORT \
-                --server.authentication=false \
-                --javascript.execute "$f" ;;
+            *.sh)
+                echo "Running $f"
+                . "$f"
+                ;;
+            *.js)
+                echo "Running $f"
+                arangosh \
+                    --server.endpoint=tcp://127.0.0.1:$ARANGO_INIT_PORT \
+                    --server.authentication=false \
+                    --javascript.execute "$f"
+                ;;
         esac
     done
 
     kill -TERM "$pid"
     wait "$pid"
+
     echo "Initialization complete"
 fi
 
@@ -112,5 +118,8 @@ exec $NUMACTL arangod \
     --rocksdb.block-cache-size="$ARANGO_CACHE" \
     --rocksdb.total-write-buffer-size="$ARANGO_CACHE" \
     --rocksdb.enforce-block-cache-size-limit=true \
+    --log.output - \
+    --log.foreground-tty true \
+    --query.slow-threshold 5 \
+    --query.tracking true \
     "$@"
-

@@ -35,8 +35,6 @@
 #include "Basics/Exceptions.h"
 #include "Logger/LogMacros.h"
 #include "Logger/Logger.h"
-#include "Futures/Future.h"
-#include "Futures/Unit.h"
 
 #include <absl/strings/str_cat.h>
 #include <velocypack/Builder.h>
@@ -207,35 +205,4 @@ auto ExecutionBlock::printTypeInfo() const -> std::string const {
 auto ExecutionBlock::printBlockInfo() const -> std::string const {
   return absl::StrCat(printTypeInfo(), " this=", (uintptr_t)this,
                       " id=", getPlanNode()->id().id());
-}
-
-auto ExecutionBlock::stopAsyncTasks() -> void {}
-
-auto ExecutionBlock::isDependencyInList(
-    std::unordered_set<ExecutionBlock*> const& seenBlocks) const noexcept
-    -> ExecutionBlock* {
-  for (auto const& dependency : _dependencies) {
-    if (seenBlocks.find(dependency) != seenBlocks.end()) {
-      return dependency;
-    }
-  }
-  return nullptr;
-}
-
-auto ExecutionBlock::printBlockAndDependenciesInfo() const noexcept
-    -> std::string const {
-  std::stringstream ss;
-  ss << printBlockInfo();
-  ss << " async prefetching type: "
-     << (int)getPlanNode()->canUseAsyncPrefetching();
-  ss << " calls: [";
-  for (auto const& dependency : _dependencies) {
-    ss << " " << dependency->printBlockInfo() << ",";
-  }
-  ss << " ]";
-  return ss.str();
-}
-
-auto ExecutionBlock::hasStoppedAsyncTasks() const noexcept -> bool {
-  return _stoppedAsyncTasks;
 }

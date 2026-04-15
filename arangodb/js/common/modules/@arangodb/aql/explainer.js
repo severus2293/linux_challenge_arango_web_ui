@@ -199,7 +199,7 @@ function pad(n) {
 }
 
 /* print query string */
-function printQuery(query, cacheable, planCacheKey) {
+function printQuery(query, cacheable) {
   'use strict';
   // restrict max length of printed query to avoid endless printing for
   // very long query strings
@@ -209,10 +209,7 @@ function printQuery(query, cacheable, planCacheKey) {
     headline += ' - truncated...';
     query = query.substr(0, maxLength / 2) + ' ... ' + query.substr(query.length - maxLength / 2);
   }
-  if (planCacheKey !== undefined) {
-    headline += ', plan cache key: "' + planCacheKey + '"';
-  }
-  headline += ', results cachable: ' + (cacheable ? 'true' : 'false');
+  headline += ', cacheable: ' + (cacheable ? 'true' : 'false');
   headline += '):';
   stringBuilder.appendLine(section(headline));
   stringBuilder.appendLine(' ' + value(stringBuilder.wrap(query, 100)));
@@ -831,11 +828,11 @@ function processQuery(query, explain, planIndex) {
     maxFilteredLen = String('Filtered').length,
     maxRuntimeLen = String('Runtime [s]').length,
     stats = explain.stats;
-  
+
   if (explain === undefined || (explain.plan === undefined && explain.plans === undefined)) {
     throw "incomplete query execution plan data - this should not happen unless when connected to a DB-Server. fetching query plans/profiles from a DB-Server is not supported!";
   }
-
+  
   let plan;
   if (planIndex !== undefined) {
     plan = explain.plans[planIndex];
@@ -1016,17 +1013,17 @@ function processQuery(query, explain, planIndex) {
     return node;
   };
 
-  const buildExpression = function (node) {
+  var buildExpression = function (node) {
     // replace "raw" value with proper subNodes
     node = checkRawData(node);
 
-    const binaryOperator = function (node, name) {
+    var binaryOperator = function (node, name) {
       if (name.match(/^[a-zA-Z]+$/)) {
         // make it a keyword
         name = keyword(name.toUpperCase());
       }
-      const lhs = buildExpression(node.subNodes[0]);
-      const rhs = buildExpression(node.subNodes[1]);
+      var lhs = buildExpression(node.subNodes[0]);
+      var rhs = buildExpression(node.subNodes[1]);
       if (node.subNodes.length === 3) {
         // array operator node... prepend "all" | "any" | "none" to node type
         name = keyword(node.subNodes[2].quantifier.toUpperCase()) + ' ' + name;
@@ -1042,14 +1039,14 @@ function processQuery(query, explain, planIndex) {
     switch (node.type) {
       case 'reference':
         if (references.hasOwnProperty(node.name)) {
-          const ref = references[node.name];
-          let c = '*';
+          var ref = references[node.name];
+          var c = '*';
           if (ref.length > 5 && ref[5]) {
             c = '?';
           }
           delete references[node.name];
           if (Array.isArray(ref)) {
-            let out = buildExpression(ref[1]) + '[' + (new Array(ref[0] + 1).join(c));
+            var out = buildExpression(ref[1]) + '[' + (new Array(ref[0] + 1).join(c));
             if (ref[2].type !== 'no-op') {
               out += ' ' + keyword('FILTER') + ' ' + buildExpression(ref[2]);
             }
@@ -1188,7 +1185,7 @@ function processQuery(query, explain, planIndex) {
     }
   };
 
-  const buildSimpleExpression = function (simpleExpressions) {
+  var buildSimpleExpression = function (simpleExpressions) {
     let rc = '';
 
     for (let indexNo in simpleExpressions) {
@@ -1214,8 +1211,8 @@ function processQuery(query, explain, planIndex) {
     return rc;
   };
 
-  const buildBound = function (attr, operators, bound) {
-    const boundValue = bound.isConstant ? value(JSON.stringify(bound.bound)) : buildExpression(bound.bound);
+  var buildBound = function (attr, operators, bound) {
+    var boundValue = bound.isConstant ? value(JSON.stringify(bound.bound)) : buildExpression(bound.bound);
     return attribute(attr) + ' ' + operators[bound.include ? 1 : 0] + ' ' + boundValue;
   };
 
@@ -1280,11 +1277,11 @@ function processQuery(query, explain, planIndex) {
     indexes.push(idx);
   };
 
-  const label = function (node) {
-    let rc, v, vNames, e, eNames, edgeCols, i, d, directions, isLast;
-    let parts = [];
-    let types = [];
-    let filter = '';
+  var label = function (node) {
+    var rc, v, vNames, e, eNames, edgeCols, i, d, directions, isLast;
+    var parts = [];
+    var types = [];
+    var filter = '';
     // index in this array gives the traversal direction
     const translate = ['ANY', 'INBOUND', 'OUTBOUND'];
     // get all indexes of a graph node, i.e. traversal, shortest path, etc.
@@ -1302,7 +1299,7 @@ function processQuery(query, explain, planIndex) {
         allIndexes.push(ix);
 
         // level-specific indexes
-        for (let l in node.indexes.levels) {
+        for (var l in node.indexes.levels) {
           ix = node.indexes.levels[l][i];
           ix.collection = node.edgeCollections[i];
           ix.condition = keyword("level " + parseInt(l, 10) + " " + translate[d]);
@@ -1432,14 +1429,6 @@ function processQuery(query, explain, planIndex) {
           return keyword('FOR') + ' ' + variableName(node.outVariable) + ' ' + keyword('IN') + ' ' + variableName(node.inVariable) + '   ' + annotation('/* list iteration */') + filter;
         }
         break;
-      case 'EnumerateNearVectorNode': {
-        let searchParameters = '';
-        if (node.hasOwnProperty("searchParameters") && JSON.stringify(node.searchParameters) !== "{}") {
-          searchParameters = keyword(' WITH SEARCH PARAMETERS ') + JSON.stringify(node.searchParameters);
-        }
-
-        return keyword('FOR') + ' ' + variableName(node.oldDocumentVariable) + keyword(' OF ') + collection(node.collection) + keyword(' IN TOP ') + node.limit + keyword(' NEAR ') + variableName(node.inVariable) + keyword(' DISTANCE INTO ') + variableName(node.distanceOutVariable) + searchParameters;
-      }
       case 'EnumerateViewNode':
         var condition = '';
         if (node.condition && node.condition.hasOwnProperty('type')) {
@@ -1836,19 +1825,10 @@ function processQuery(query, explain, planIndex) {
           (node.keepVariables ? ' ' + keyword('KEEP') + ' ' + node.keepVariables.map(function (variable) { return variableName(variable.variable); }).join(', ') : '') +
           '   ' + annotation('/* ' + node.collectOptions.method + ' */');
         return collect;
-      case 'IndexCollectNode':
-        iterateIndexes(node.index, 0, node, types, false);
-        return keyword('FOR ') + variableName(node.oldIndexVariable) + keyword(' IN ') + collection(node.collection) + keyword(' COLLECT ') + node.groups.map(function (grp) {
-          return variableName(grp.outVariable) + ' = ' + variableName(node.oldIndexVariable) + '.' + grp.attribute.map((p) => attribute(p)).join('.');
-        }).join(', ') + annotation(' /* distinct value index scan */');
       case 'SortNode':
-        const groupedElements = node.numberOfTopGroupedElements > 0 ?
-          '; ' + keyword('GROUPED BY') + ' '
-          + node.elements.slice(0, node.numberOfTopGroupedElements).map((element) => variableName(element.inVariable)).join(', ') : '';
-        return keyword('SORT') + ' '
-          + node.elements.slice(node.numberOfTopGroupedElements, node.elements.length).map((node) => variableName(node.inVariable) + ' ' + keyword(node.ascending ? 'ASC' : 'DESC')).join(', ')
-          + groupedElements
-          + annotation(`   /* sorting strategy: ${node.strategy.split("-").join(" ")} */`);
+        return keyword('SORT') + ' ' + node.elements.map(function (node) {
+          return variableName(node.inVariable) + ' ' + keyword(node.ascending ? 'ASC' : 'DESC');
+        }).join(', ') + annotation(`   /* sorting strategy: ${node.strategy.split("-").join(" ")} */`);
       case 'LimitNode':
         return keyword('LIMIT') + ' ' + value(JSON.stringify(node.offset)) + ', ' + value(JSON.stringify(node.limit)) + (node.fullCount ? '  ' + annotation('/* fullCount */') : '');
       case 'ReturnNode':
@@ -2281,7 +2261,7 @@ function processQuery(query, explain, planIndex) {
   };
 
   if (planIndex === undefined) {
-    printQuery(query, explain.cacheable, explain.planCacheKey);
+    printQuery(query, explain.cacheable);
   }
 
   stringBuilder.appendLine(section('Execution plan:'));
@@ -2412,9 +2392,6 @@ function profileQuery(data, shouldPrint) {
   let stmt = db._createStatement(data);
   let cursor = stmt.execute();
   let extra = cursor.getExtra();
-  if (cursor.planCacheKey !== undefined) {
-    extra.planCacheKey = cursor.planCacheKey;
-  }
   processQuery(data.query, extra, undefined);
 
   if (shouldPrint === undefined || shouldPrint) {
@@ -2564,7 +2541,7 @@ function debug(query, bindVars, options) {
         name: collection.name,
         type: c.type(),
         properties: c.properties(),
-        indexes: c.indexes(true),
+        indexes: c.getIndexes(true),
         count: c.count(),
         counts: c.count(true),
         examples

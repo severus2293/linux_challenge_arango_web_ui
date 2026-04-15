@@ -9,7 +9,7 @@ if (NOT USE_ENTERPRISE)
 endif ()
 
 target_link_libraries(arango_geo
-  arango_basic_utils
+  arango
   boost_system
   boost_boost
   s2)

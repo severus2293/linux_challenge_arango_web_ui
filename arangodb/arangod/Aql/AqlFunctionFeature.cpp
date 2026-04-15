@@ -24,10 +24,13 @@
 #include "AqlFunctionFeature.h"
 
 #include "ApplicationFeatures/ApplicationServer.h"
+#include "Aql/AstNode.h"
 #include "Aql/Function.h"
-#include "Aql/Functions.h"
 #include "Basics/StringUtils.h"
-#include "RestServer/VectorIndexFeature.h"
+#include "Cluster/ServerState.h"
+#include "FeaturePhases/ClusterFeaturePhase.h"
+#include "StorageEngine/EngineSelectorFeature.h"
+#include "StorageEngine/StorageEngine.h"
 
 using namespace arangodb::application_features;
 
@@ -63,17 +66,15 @@ void AqlFunctionFeature::prepare() {
 
 void AqlFunctionFeature::add(Function const& func) {
   TRI_ASSERT(func.name == basics::StringUtils::toupper(func.name));
-  _functionNames.doUnderLock(
-      [&](auto& functions) { functions.try_emplace(func.name, func); });
+  TRI_ASSERT(!_functionNames.contains(func.name));
+  // add function to the map
+  _functionNames.try_emplace(func.name, func);
 }
 
 void AqlFunctionFeature::addAlias(std::string const& alias,
                                   std::string const& original) {
-  auto it = _functionNames.doUnderLock([&](auto const& functions) {
-    auto it = functions.find(original);
-    TRI_ASSERT(it != functions.end());
-    return it;
-  });
+  auto it = _functionNames.find(original);
+  TRI_ASSERT(it != _functionNames.end());
 
   // intentionally copy original function, as we want to give it another name
   Function aliasFunction = (*it).second;
@@ -84,33 +85,27 @@ void AqlFunctionFeature::addAlias(std::string const& alias,
 
 void AqlFunctionFeature::toVelocyPack(VPackBuilder& builder) const {
   builder.openArray();
-  _functionNames.doUnderLock([&](auto const& functions) {
-    for (auto const& it : functions) {
-      if (it.second.hasFlag(FF::Internal)) {
-        // don't serialize internal functions
-        continue;
-      }
-      it.second.toVelocyPack(builder);
+  for (auto const& it : _functionNames) {
+    if (it.second.hasFlag(FF::Internal)) {
+      // don't serialize internal functions
+      continue;
     }
-  });
+    it.second.toVelocyPack(builder);
+  }
   builder.close();
 }
 
 bool AqlFunctionFeature::exists(std::string const& name) const {
-  return _functionNames.doUnderLock(
-      [&](auto const& functions) { return functions.contains(name); });
+  return _functionNames.contains(name);
 }
 
 Function const* AqlFunctionFeature::byName(std::string const& name) const {
-  auto it = _functionNames.doUnderLock([&](auto const& functions) {
-    auto it = functions.find(name);
+  auto it = _functionNames.find(name);
 
-    if (it == functions.end()) {
-      THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_NAME_UNKNOWN,
-                                    name.c_str());
-    }
-    return it;
-  });
+  if (it == _functionNames.end()) {
+    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_NAME_UNKNOWN,
+                                  name.c_str());
+  }
 
   // return the address of the function
   return &((*it).second);
@@ -595,19 +590,6 @@ void AqlFunctionFeature::addMiscFunctions() {
                            FF::CanRunOnDBServerCluster,
                            FF::CanRunOnDBServerOneShard),
        &functions::MakeDistributeGraphInput});
-
-  if (server().getFeature<VectorIndexFeature>().isVectorIndexEnabled()) {
-    add({"APPROX_NEAR_COSINE", ".,.|.",
-         Function::makeFlags(FF::Deterministic, FF::Cacheable,
-                             FF::CanRunOnDBServerCluster,
-                             FF::CanRunOnDBServerOneShard),
-         &functions::ApproxNearCosine});
-    add({"APPROX_NEAR_L2", ".,.|.",
-         Function::makeFlags(FF::Deterministic, FF::Cacheable,
-                             FF::CanRunOnDBServerCluster,
-                             FF::CanRunOnDBServerOneShard),
-         &functions::ApproxNearL2});
-  }
 #ifdef USE_ENTERPRISE
   add({"SELECT_SMART_DISTRIBUTE_GRAPH_INPUT", ".,.",
        Function::makeFlags(FF::Deterministic, FF::Cacheable, FF::Internal,

@@ -27,7 +27,8 @@
 
 #include <v8.h>
 
-namespace arangodb::aql {
+namespace arangodb {
+namespace aql {
 
 struct QueryResultV8 : public QueryResult {
   QueryResultV8(QueryResultV8 const& other) = delete;
@@ -55,5 +56,5 @@ struct QueryResultV8 : public QueryResult {
 
   v8::Local<v8::Array> v8Data;
 };
-
-}  // namespace arangodb::aql
+}  // namespace aql
+}  // namespace arangodb

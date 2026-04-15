@@ -1,4 +1,3 @@
-import { ReactTable, useSortableReactTable } from "@arangodb/ui";
 import {
   Box,
   Flex,
@@ -15,6 +14,8 @@ import { createColumnHelper } from "@tanstack/react-table";
 import d3 from "d3";
 import React from "react";
 import { Cell, Legend, Pie, PieChart, Tooltip } from "recharts";
+import { ReactTable } from "../../../components/table/ReactTable";
+import { useSortableReactTable } from "../../../components/table/useSortableReactTable";
 import { RebalanceShards } from "./RebalanceShards";
 import {
   ServerShardStatisticsData,

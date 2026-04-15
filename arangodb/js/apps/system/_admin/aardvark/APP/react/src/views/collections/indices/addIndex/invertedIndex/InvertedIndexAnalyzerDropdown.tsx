@@ -1,10 +1,11 @@
-import { SingleSelectControl, OptionType } from "@arangodb/ui";
 import { FormLabel, Spacer } from "@chakra-ui/react";
 import { useField, useFormikContext } from "formik";
 import React, { useEffect, useState } from "react";
 import useSWR from "swr";
-import { FormFieldProps } from "../../../../../components/form/FormField";
+import { SelectControl } from "../../../../../components/form/SelectControl";
+import { OptionType } from "../../../../../components/select/SelectBase";
 import { getCurrentDB } from "../../../../../utils/arangoClient";
+import { FormFieldProps } from "../../../../../components/form/FormField";
 import { InvertedIndexValuesType } from "./useCreateInvertedIndex";
 
 export const InvertedIndexAnalyzerDropdown = ({
@@ -59,7 +60,7 @@ export const InvertedIndexAnalyzerDropdown = ({
   return (
     <>
       <FormLabel htmlFor={field.name}>{field.label}</FormLabel>
-      <SingleSelectControl
+      <SelectControl
         isDisabled={field.isDisabled}
         selectProps={{
           autoFocus,

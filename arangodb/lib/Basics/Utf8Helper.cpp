@@ -59,9 +59,13 @@
 using namespace arangodb::basics;
 using namespace icu_64_64;
 
-Utf8Helper Utf8Helper::DefaultUtf8Helper(0);
+Utf8Helper Utf8Helper::DefaultUtf8Helper;
 
-Utf8Helper::Utf8Helper(int) {}
+Utf8Helper::Utf8Helper(std::string const& lang) {
+  setCollatorLanguage(lang, LanguageType::DEFAULT);
+}
+
+Utf8Helper::Utf8Helper() : Utf8Helper("") {}
 
 Utf8Helper::~Utf8Helper() {
   if (_coll) {

@@ -42,12 +42,6 @@
 
 namespace arangodb {
 class ExecContext;
-namespace futures {
-template<typename T>
-class Future;
-
-struct Unit;
-}  // namespace futures
 }  // namespace arangodb
 
 namespace arangodb::aql {
@@ -74,7 +68,6 @@ class MultiDependencySingleRowFetcher;
 class RegisterInfos;
 class SubqueryStartExecutor;
 class SubqueryEndExecutor;
-class EnumerateNearVectorsExecutor;
 
 template<typename T, typename... Es>
 constexpr bool is_one_of_v = (std::is_same_v<T, Es> || ...);
@@ -240,8 +233,6 @@ class ExecutionBlockImpl final : public ExecutionBlock {
   // an ongoing query in a specific state.
   auto testInjectInputRange(DataRange range, SkipResult skipped) -> void;
 #endif
-
-  void stopAsyncTasks() override;
 
  private:
   struct ExecutionContext {
@@ -414,8 +405,6 @@ class ExecutionBlockImpl final : public ExecutionBlock {
 
     ExecutionBlockImpl& _block;
     AqlCallStack _stack;
-    mutable std::atomic<uint64_t> _numberWaiters{0};
-    mutable std::atomic<bool> _logStacktrace{false};
   };
 
   /**

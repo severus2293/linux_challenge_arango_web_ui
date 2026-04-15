@@ -25,7 +25,6 @@
 
 #include "ApplicationFeatures/ApplicationFeature.h"
 #include "Aql/Function.h"
-#include "Basics/Guarded.h"
 #include "RestServer/arangod.h"
 
 namespace arangodb {
@@ -68,7 +67,7 @@ class AqlFunctionFeature final : public ArangodFeature {
   void addMiscFunctions();
 
   /// @brief AQL user-callable function names
-  Guarded<std::unordered_map<std::string, Function const>> _functionNames;
+  std::unordered_map<std::string, Function const> _functionNames;
 };
 
 }  // namespace aql

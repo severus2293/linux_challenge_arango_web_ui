@@ -72,7 +72,6 @@ AgencyFeature::AgencyFeature(Server& server)
       _maxAppendSize(250),
       _supervisionGracePeriod(10.0),
       _supervisionOkThreshold(5.0),
-      _supervisionExpiredServersGracePeriod(3600.0),
       _supervisionDelayAddFollower(0),
       _supervisionDelayFailedFollower(0),
       _failedLeaderAddsFollower(true) {
@@ -174,17 +173,6 @@ cluster deployments.)");
                      arangodb::options::makeFlags(
                          arangodb::options::Flags::DefaultNoComponents,
                          arangodb::options::Flags::OnAgent));
-
-  options
-      ->addOption("--agency.supervision-expired-servers-grace-period",
-                  "The supervision time after which a server is removed "
-                  "from the agency if it does no longer send heartbeats "
-                  "(in seconds).",
-                  new DoubleParameter(&_supervisionExpiredServersGracePeriod),
-                  arangodb::options::makeFlags(
-                      arangodb::options::Flags::DefaultNoComponents,
-                      arangodb::options::Flags::OnAgent))
-      .setIntroducedIn(31204);
 
   options
       ->addOption("--agency.supervision-delay-add-follower",
@@ -428,8 +416,7 @@ void AgencyFeature::prepare() {
           _waitForSync, _supervisionFrequency, _compactionStepSize,
           _compactionKeepSize, _supervisionGracePeriod, _supervisionOkThreshold,
           _supervisionDelayAddFollower, _supervisionDelayFailedFollower,
-          _failedLeaderAddsFollower, _maxAppendSize,
-          _supervisionExpiredServersGracePeriod));
+          _failedLeaderAddsFollower, _maxAppendSize));
 }
 
 void AgencyFeature::start() {

@@ -60,26 +60,12 @@ struct QueryOptions {
     return traversalProfile;
   }
 
-  // memory limit threshold value for query
   size_t memoryLimit;
-
-  // maximum number of query plans to generate
   size_t maxNumberOfPlans;
-
-  // maximum number of query warnings to collect
   size_t maxWarningCount;
-
-  // maximum number of execution nodes inside each callstack
   size_t maxNodesPerCallstack;
   size_t spillOverThresholdNumRows;
   size_t spillOverThresholdMemoryUsage;
-
-  // maximum number of members in normalized filter conditions when
-  // turning filter conditions into DNF. normalizing filter conditions
-  // can lead to very broad DNF trees with lots of member nodes.
-  // once the DNF condition reaches this amount of members, the
-  // normalization is aborted and the query is continued without the
-  // normalization to save time.
   size_t maxDNFConditionMembers;
   // query has to execute within the given time or will be killed
   double maxRuntime;
@@ -88,10 +74,8 @@ struct QueryOptions {
   std::chrono::duration<double> satelliteSyncWait;
 #endif
 
-  // time until query cursor expires - avoids coursors to stick around for ever
-  // if client does not collect the data
-  double ttl;
-
+  double ttl;  // time until query cursor expires - avoids coursors to
+               // stick around for ever if client does not collect the data
   /// Level 0 nothing, Level 1 profile, Level 2,3 log tracing info
   ProfileLevel profile;
   TraversalProfileLevel traversalProfile;
@@ -101,9 +85,7 @@ struct QueryOptions {
   bool verbosePlans;
   // add even more detail (internals) to query execution plans
   bool explainInternals;
-  // whether or not the query is a streaming query
   bool stream;
-  // whether or not the query's cursor supports retrying fetch requests
   bool retriable;
   // do not return query results
   bool silent;
@@ -117,13 +99,8 @@ struct QueryOptions {
   bool count;
   // skips audit logging - used only internally
   bool skipAudit;
-  // whether or not the plan is optimized in a way such that the optimizer
-  // result can be cached
+  // whether or not the optimizer result should be cached
   bool optimizePlanForCaching;
-  // whether or not the optimizer plan cache should be used, note that
-  // if usePlanCache is set then optimizePlanForCaching is also automatically
-  // set to true.
-  bool usePlanCache;
 
   ExplainRegisterPlan explainRegisters;
 

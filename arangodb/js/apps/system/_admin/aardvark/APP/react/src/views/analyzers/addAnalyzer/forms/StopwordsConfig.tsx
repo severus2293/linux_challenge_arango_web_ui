@@ -1,6 +1,7 @@
-import { CreatableMultiSelectControl, SwitchControl } from "@arangodb/ui";
 import { Grid } from "@chakra-ui/react";
 import React from "react";
+import { CreatableMultiSelectControl } from "../../../../components/form/CreatableMultiSelectControl";
+import { SwitchControl } from "../../../../components/form/SwitchControl";
 import { useAnalyzersContext } from "../../AnalyzersContext";
 
 export const StopwordsConfig = ({

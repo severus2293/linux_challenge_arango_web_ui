@@ -262,7 +262,7 @@ function EdgeIndexSuite () {
     // //////////////////////////////////////////////////////////////////////////////
 
     testIndexPresence: function () {
-      var indexes = edge.indexes();
+      var indexes = edge.getIndexes();
       assertEqual(2, indexes.length);
       assertEqual('edge', indexes[1].type);
       assertEqual([ '_from', '_to' ], indexes[1].fields);

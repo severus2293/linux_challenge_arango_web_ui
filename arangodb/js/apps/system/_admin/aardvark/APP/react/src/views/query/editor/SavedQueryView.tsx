@@ -1,4 +1,3 @@
-import { ReactTable, TableControl, useSortableReactTable } from "@arangodb/ui";
 import { ArrowBackIcon, CopyIcon, DeleteIcon } from "@chakra-ui/icons";
 import {
   Box,
@@ -17,6 +16,9 @@ import { InfoCircle } from "styled-icons/boxicons-solid";
 import { PlayArrow } from "styled-icons/material";
 import aqlTemplates from "../../../../public/assets/aqltemplates.json";
 import { ControlledJSONEditor } from "../../../components/jsonEditor/ControlledJSONEditor";
+import { ReactTable } from "../../../components/table/ReactTable";
+import { TableControl } from "../../../components/table/TableControl";
+import { useSortableReactTable } from "../../../components/table/useSortableReactTable";
 import { download } from "../../../utils/downloadHelper";
 import { useQueryContext } from "../QueryContextProvider";
 import { AQLEditor } from "./AQLEditor";
@@ -218,7 +220,11 @@ const SavedQueryTable = ({ savedQueries }: { savedQueries?: QueryType[] }) => {
     >
       <Stack height="full" overflow="hidden">
         <Box paddingLeft="2" paddingTop="1">
-          <TableControl table={tableInstance} showColumnSelector={false} />
+          <TableControl
+            table={tableInstance}
+            columns={TABLE_COLUMNS}
+            showColumnSelector={false}
+          />
         </Box>
         <ReactTable<QueryType>
           table={tableInstance}

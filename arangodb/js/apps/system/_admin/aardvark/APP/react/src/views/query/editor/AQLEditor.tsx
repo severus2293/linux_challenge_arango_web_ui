@@ -78,6 +78,7 @@ export const AQLEditor = ({
             width: "100%"
           }
         }}
+        // @ts-ignore
         mainMenuBar={false}
       />
     </>

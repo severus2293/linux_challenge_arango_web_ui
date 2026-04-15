@@ -85,6 +85,7 @@ export const BindVariablesTab = ({ mode }: { mode: "json" | "table" }) => {
         /**
          * This option will get passed on the jsonEditor.
          * */
+        // @ts-ignore
         mainMenuBar={false}
       />
       <JSONErrors

@@ -33,9 +33,6 @@ const pu = require('@arangodb/testutils/process-utils');
 const fs = require('fs');
 const { sanHandler } = require('@arangodb/testutils/san-file-handler');
 const executeExternal = internal.executeExternal;
-const { versionHas } = require("@arangodb/test-helper");
-const isCov = versionHas('coverage');
-const isSan = versionHas('tsan') || versionHas('aulsan');
 
 /* Functions: */
 const toArgv = internal.toArgv;
@@ -315,12 +312,6 @@ function makeArgsArangosh (options) {
     'flatCommands': ['--console.colors', 'false', '--quiet']
   };
 
-  if (isCov) {
-    args['server.request-timeout'] = 1200 * 4; // quadruple the default
-  }
-  if (isSan) {
-    args['server.request-timeout'] = 1200 * 2; // double the default
-  }
   if (options.forceNoCompress) {
     args['compress-transfer'] = false;
   }
@@ -354,13 +345,9 @@ function launchInShellBG  (file) {
   let IM = global.instanceManager;
   let args = makeArgsArangosh(IM.options);
   const logFile = `file://${file}.log`;
-  let timeout = 30;
-  if (isCov || isSan) {
-    timeout *= 6; // quadruple the timeout
-  }
   let moreArgs = {
     'server.database': arango.getDatabaseName(),
-    'server.request-timeout': timeout,
+    'server.request-timeout': '30',
     'log.foreground-tty': 'false',
     //'log.level': ['info', 'httpclient=debug', 'V8=debug'],
     'log.output': logFile,
@@ -468,14 +455,9 @@ function joinBGShells (options, clients, waitFor, cn) {
           client.failed = failed;
           client.done = true;
         }
-        if (client.status === 'TERMINATED') {
-          if (client.exit === 0) {
-            IM.serverCrashedLocal |= client.client.sh.fetchSanFileAfterExit(client.client.pid);
-            client.failed = false;
-          } else {
-            IM.options.cleanup = false;
-            client.failed = true;
-          }
+        if (client.status.status === 'TERMINATED' && client.status.exit === 0) {
+          IM.serverCrashedLocal |= client.client.sh.fetchSanFileAfterExit(client.client.pid);
+          client.failed = false;
         }
       }
     });
@@ -555,16 +537,6 @@ function rtaMakedata(options, instanceManager, writeReadClean, msg, logFile, mor
   if (addArgs !== undefined) {
     args = Object.assign(args, addArgs);
   }
-  // TODO: vector index broken on circleci-ARM
-  if (versionHas("arm")) {
-    let skipOffset = moreargv.findIndex(i => {return i === '--skip';});
-    if (skipOffset >= 0) {
-      moreargv[skipOffset + 1] += ',107';
-    } else {
-      moreargv = ['--skip', '107_'];
-    }
-  }
-    
   let argv = toArgv(args);
   argv = argv.concat(['--', options.makedataDB],
                      moreargv, [
@@ -586,7 +558,7 @@ function rtaMakedata(options, instanceManager, writeReadClean, msg, logFile, mor
     print(argv);
   }
   
-  let timeout = (options.isInstrumented) ? 60 * 30 : 60 * 15;
+  let timeout = (options.isInstrumented) ? 60 * 26 : 60 * 15;
   return pu.executeAndWait(pu.ARANGOSH_BIN, argv, options, 'arangosh', instanceManager.rootDir, options.coreCheck, timeout);
 }
 function rtaWaitShardsInSync(options, instanceManager) {
@@ -609,7 +581,6 @@ function rtaWaitShardsInSync(options, instanceManager) {
     print(myargs);
   }
   let rc = pu.executeAndWait(pu.ARANGOSH_BIN, myargs, options, 'arangosh', instanceManager.rootDir, options.coreCheck);
-  return rc;
 }
 // //////////////////////////////////////////////////////////////////////////////
 // / @brief runs arangoimport

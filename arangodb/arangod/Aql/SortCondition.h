@@ -86,16 +86,6 @@ class SortCondition {
       Variable const*,
       std::vector<std::vector<arangodb::basics::AttributeName>> const&) const;
 
-  size_t coveredUnidirectionalAttributes(
-      Variable const* reference,
-      std::vector<std::vector<arangodb::basics::AttributeName>> const&
-          indexFieldAttributes) const;
-
-  std::tuple<size_t, bool> coveredUnidirectionalAttributesWithDirection(
-      Variable const* reference,
-      std::vector<std::vector<arangodb::basics::AttributeName>> const&
-          indexFieldAttributes) const;
-
   /// @brief returns true if all attributes in the sort condition are proven
   /// to be non-null
   bool onlyUsesNonNullSortAttributes(
@@ -109,16 +99,14 @@ class SortCondition {
   std::tuple<Variable const*, AstNode const*, bool> field(
       size_t position) const;
 
+ private:
   struct SortField {
     Variable const* variable;
     std::vector<arangodb::basics::AttributeName> attributes;
     AstNode const* node;
-    bool asc;
+    bool order;
   };
 
-  std::vector<SortField> const& sortFields() const noexcept { return _fields; }
-
- private:
   ExecutionPlan* _plan;
 
   /// @brief fields used in the sort conditions

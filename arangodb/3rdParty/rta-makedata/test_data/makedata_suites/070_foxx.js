@@ -1,10 +1,16 @@
-/* global print, fs, db, internal, arango, assertTrue, assertEqual, assertFalse */
+/* global print, fs, db, internal, arango, assertTrue */
 
 // inspired by shell-foxx-api-spec.js
 
 const utils = require('@arangodb/foxx/manager-utils');
 const download = internal.download;
 const path = require('path');
+
+const {
+  assertTrue,
+  assertFalse,
+  assertEqual
+} = require("jsunity").jsUnity.assertions;
 
 function loadFoxxIntoZip (path) {
   let zip = utils.zipDirectory(path);

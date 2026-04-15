@@ -32,5 +32,4 @@ target_sources(arango_aql PRIVATE
   TestFunctions.cpp
   TypeCheckFunctions.cpp
   UuidFunctions.cpp
-  VectorFunctions.cpp
 )

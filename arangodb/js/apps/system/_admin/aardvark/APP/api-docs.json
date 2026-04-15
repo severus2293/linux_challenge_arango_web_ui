@@ -2,7 +2,7 @@
  "info": {
   "description": "ArangoDB REST API Interface",
   "title": "ArangoDB",
-  "version": "3.12.4-3"
+  "version": "3.12.3-1"
  },
  "openapi": "3.1.0",
  "paths": {
@@ -218,7 +218,7 @@
     },
     "responses": {
      "200": {
-      "description": "Is returned if the backup could be restored. Note that there is an\ninevitable discrepancy between the single server and the cluster. In a\nsingle server, the request returns successfully, but the restore is\nonly executed afterwards. In the cluster, the request only returns when\nthe restore operation has been completed successfully. The cluster\nbehavior is obviously the desired one, but in a single instance, one\ncannot keep a connection open across a restart.\n"
+      "description": "Is returned if the backup could be restored. Note that there is an\ninevitable discrepancy between the single server and the cluster. In a\nsingle server, the request returns successfully, but the restore is\nonly executed afterwards. In the cluster, the request only returns when\nthe restore operation has been completed successfully. The cluster\nbehaviour is obviously the desired one, but in a single instance, one\ncannot keep a connection open across a restart.\n"
      },
      "400": {
       "description": "If the restore command is invoked with bad parameters or any HTTP\nmethod other than `POST`, then an *HTTP 400* is returned. The specifics\nare detailed in the returned error document.\n"
@@ -420,11 +420,7 @@
        "schema": {
         "properties": {
          "mode": {
-          "description": "The mode to put the DB-Server in.\n",
-          "enum": [
-           "maintenance",
-           "normal"
-          ],
+          "description": "The mode to put the DB-Server in. Possible values:\n- `\"maintenance\"`\n- `\"normal\"`\n",
           "type": "string"
          },
          "timeout": {
@@ -2333,15 +2329,7 @@
            "type": "integer"
           },
           "role": {
-           "description": "The server role.\n- `SINGLE`: the server is a standalone server without clustering\n- `COORDINATOR`: the server is a Coordinator in a cluster\n- `PRIMARY`: the server is a DB-Server in a cluster\n- `SECONDARY`: this role is not used anymore\n- `AGENT`: the server is an Agency node in a cluster\n- `UNDEFINED`: in a cluster, this is returned if the server role cannot be\n   determined.\n",
-           "enum": [
-            "SINGLE",
-            "COORDINATOR",
-            "PRIMARY",
-            "SECONDARY",
-            "AGENT",
-            "UNDEFINED"
-           ],
+           "description": "The server role. Possible values:\n- `SINGLE`: the server is a standalone server without clustering\n- `COORDINATOR`: the server is a Coordinator in a cluster\n- `PRIMARY`: the server is a DB-Server in a cluster\n- `SECONDARY`: this role is not used anymore\n- `AGENT`: the server is an Agency node in a cluster\n- `UNDEFINED`: in a cluster, this is returned if the server role cannot be\n   determined.\n",
            "type": "string"
           }
          },
@@ -2986,13 +2974,7 @@
            "type": "string"
           },
           "status": {
-           "description": "The `status` key allows you to confirm the state of the installed license on a\nglance.\n\n- `good`: The license is valid for more than 2 weeks.\n- `expiring`: The license is valid for less than 2 weeks.\n- `expired`: The license has expired. In this situation, no new\n  Enterprise Edition features can be utilized.\n- `read-only`: The license is expired over 2 weeks. The instance is now\n  restricted to read-only mode.\n",
-           "enum": [
-            "good",
-            "expiring",
-            "expired",
-            "read-only"
-           ],
+           "description": "The `status` key allows you to confirm the state of the installed license on a\nglance. The possible values are as follows:\n\n- `good`: The license is valid for more than 2 weeks.\n- `expiring`: The license is valid for less than 2 weeks.\n- `expired`: The license has expired. In this situation, no new\n  Enterprise Edition features can be utilized.\n- `read-only`: The license is expired over 2 weeks. The instance is now\n  restricted to read-only mode.\n",
            "example": "good",
            "type": "string"
           },
@@ -4568,16 +4550,9 @@
          "features": {
           "description": "The set of features to set on the Analyzer generated fields.\nThe default value is an empty array.\n",
           "items": {
-           "enum": [
-            "frequency",
-            "norm",
-            "position",
-            "offset"
-           ],
            "type": "string"
           },
-          "type": "array",
-          "uniqueItems": true
+          "type": "array"
          },
          "name": {
           "description": "The Analyzer name.\n",
@@ -5574,13 +5549,7 @@
              "type": "integer"
             },
             "type": {
-             "description": "Specifies the type of the key generator.\n",
-             "enum": [
-              "traditional",
-              "autoincrement",
-              "uuid",
-              "padded"
-             ],
+             "description": "Specifies the type of the key generator. Possible values:\n- `\"traditional\"`\n- `\"autoincrement\"`\n- `\"uuid\"`\n- `\"padded\"`\n",
              "type": "string"
             }
            },
@@ -5614,15 +5583,7 @@
            "type": "array"
           },
           "shardingStrategy": {
-           "description": "The sharding strategy selected for the collection. _(cluster only)_\n",
-           "enum": [
-            "community-compat",
-            "enterprise-compat",
-            "enterprise-smart-edge-compat",
-            "hash",
-            "enterprise-hash-smart-edge",
-            "enterprise-hex-smart-vertex"
-           ],
+           "description": "The sharding strategy selected for the collection. _(cluster only)_\n\nPossible values:\n- `\"community-compat\"`\n- `\"enterprise-compat\"`\n- `\"enterprise-smart-edge-compat\"`\n- `\"hash\"`\n- `\"enterprise-hash-smart-edge\"`\n- `\"enterprise-hex-smart-vertex\"`\n",
            "type": "string"
           },
           "smartGraphAttribute": {
@@ -6386,13 +6347,7 @@
              "type": "integer"
             },
             "type": {
-             "description": "Specifies the type of the key generator.\n",
-             "enum": [
-              "traditional",
-              "autoincrement",
-              "uuid",
-              "padded"
-             ],
+             "description": "Specifies the type of the key generator. Possible values:\n- `\"traditional\"`\n- `\"autoincrement\"`\n- `\"uuid\"`\n- `\"padded\"`\n",
              "type": "string"
             }
            },
@@ -6426,15 +6381,7 @@
            "type": "array"
           },
           "shardingStrategy": {
-           "description": "The sharding strategy selected for the collection. _(cluster only)_\n",
-           "enum": [
-            "community-compat",
-            "enterprise-compat",
-            "enterprise-smart-edge-compat",
-            "hash",
-            "enterprise-hash-smart-edge",
-            "enterprise-hex-smart-vertex"
-           ],
+           "description": "The sharding strategy selected for the collection. _(cluster only)_\n\nPossible values:\n- `\"community-compat\"`\n- `\"enterprise-compat\"`\n- `\"enterprise-smart-edge-compat\"`\n- `\"hash\"`\n- `\"enterprise-hash-smart-edge\"`\n- `\"enterprise-hex-smart-vertex\"`\n",
            "type": "string"
           },
           "smartGraphAttribute": {
@@ -6487,13 +6434,10 @@
       "description": "All properties of the collection but additionally the document `count`.\n"
      },
      "400": {
-      "description": "The `collection-name` parameter is missing.\n"
+      "description": "If the `collection-name` placeholder is missing, then a *HTTP 400* is\nreturned.\n"
      },
      "404": {
-      "description": "The collection cannot be found.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "If the collection is unknown, then a *HTTP 404*\nis returned.\n"
      }
     },
     "summary": "Get the document count of a collection",
@@ -6684,13 +6628,7 @@
              "type": "integer"
             },
             "type": {
-             "description": "Specifies the type of the key generator.\n",
-             "enum": [
-              "traditional",
-              "autoincrement",
-              "uuid",
-              "padded"
-             ],
+             "description": "Specifies the type of the key generator. Possible values:\n- `\"traditional\"`\n- `\"autoincrement\"`\n- `\"uuid\"`\n- `\"padded\"`\n",
              "type": "string"
             }
            },
@@ -6724,15 +6662,7 @@
            "type": "array"
           },
           "shardingStrategy": {
-           "description": "The sharding strategy selected for the collection. _(cluster only)_\n",
-           "enum": [
-            "community-compat",
-            "enterprise-compat",
-            "enterprise-smart-edge-compat",
-            "hash",
-            "enterprise-hash-smart-edge",
-            "enterprise-hex-smart-vertex"
-           ],
+           "description": "The sharding strategy selected for the collection. _(cluster only)_\n\nPossible values:\n- `\"community-compat\"`\n- `\"enterprise-compat\"`\n- `\"enterprise-smart-edge-compat\"`\n- `\"hash\"`\n- `\"enterprise-hash-smart-edge\"`\n- `\"enterprise-hex-smart-vertex\"`\n",
            "type": "string"
           },
           "smartGraphAttribute": {
@@ -7311,13 +7241,7 @@
              "type": "integer"
             },
             "type": {
-             "description": "Specifies the type of the key generator.\n",
-             "enum": [
-              "traditional",
-              "autoincrement",
-              "uuid",
-              "padded"
-             ],
+             "description": "Specifies the type of the key generator. Possible values:\n- `\"traditional\"`\n- `\"autoincrement\"`\n- `\"uuid\"`\n- `\"padded\"`\n",
              "type": "string"
             }
            },
@@ -7351,15 +7275,7 @@
            "type": "array"
           },
           "shardingStrategy": {
-           "description": "The sharding strategy selected for the collection. _(cluster only)_\n",
-           "enum": [
-            "community-compat",
-            "enterprise-compat",
-            "enterprise-smart-edge-compat",
-            "hash",
-            "enterprise-hash-smart-edge",
-            "enterprise-hex-smart-vertex"
-           ],
+           "description": "The sharding strategy selected for the collection. _(cluster only)_\n\nPossible values:\n- `\"community-compat\"`\n- `\"enterprise-compat\"`\n- `\"enterprise-smart-edge-compat\"`\n- `\"hash\"`\n- `\"enterprise-hash-smart-edge\"`\n- `\"enterprise-hex-smart-vertex\"`\n",
            "type": "string"
           },
           "smartGraphAttribute": {
@@ -7452,6 +7368,7 @@
        "schema": {
         "properties": {
          "cacheEnabled": {
+          "default": false,
           "description": "Whether the in-memory hash cache for documents should be enabled for this\ncollection. Can be controlled globally with the `--cache.size`\nstartup option. The cache can speed up repeated reads of the same documents via\ntheir document keys. If the same documents are not fetched often or are\nmodified frequently, then you may disable the cache to avoid the maintenance\ncosts.\n",
           "type": "boolean"
          },
@@ -7510,6 +7427,7 @@
           "type": "array"
          },
          "replicationFactor": {
+          "default": 1,
           "description": "In a cluster, this attribute determines how many copies\nof each shard are kept on different DB-Servers. The value 1 means that only one\ncopy (no synchronous replication) is kept. A value of k means that k-1 replicas\nare kept. For SatelliteCollections, it needs to be the string `\"satellite\"`,\nwhich matches the replication factor to the number of DB-Servers\n(Enterprise Edition only).\n\nAny two copies reside on different DB-Servers. Replication between them is\nsynchronous, that is, every write operation to the \"leader\" copy will be replicated\nto all \"follower\" replicas, before the write operation is reported successful.\n\nIf a server fails, this is detected automatically and one of the servers holding\ncopies take over, usually without an error being reported.\n",
           "type": "integer"
          },
@@ -7518,6 +7436,7 @@
           "type": "object"
          },
          "waitForSync": {
+          "default": false,
           "description": "If set to `true`, the data is synchronized to disk before returning from a\ndocument create, update, replace or removal operation.\n",
           "type": "boolean"
          },
@@ -7647,13 +7566,7 @@
              "type": "integer"
             },
             "type": {
-             "description": "Specifies the type of the key generator.\n",
-             "enum": [
-              "traditional",
-              "autoincrement",
-              "uuid",
-              "padded"
-             ],
+             "description": "Specifies the type of the key generator. Possible values:\n- `\"traditional\"`\n- `\"autoincrement\"`\n- `\"uuid\"`\n- `\"padded\"`\n",
              "type": "string"
             }
            },
@@ -7687,15 +7600,7 @@
            "type": "array"
           },
           "shardingStrategy": {
-           "description": "The sharding strategy selected for the collection. _(cluster only)_\n",
-           "enum": [
-            "community-compat",
-            "enterprise-compat",
-            "enterprise-smart-edge-compat",
-            "hash",
-            "enterprise-hash-smart-edge",
-            "enterprise-hex-smart-vertex"
-           ],
+           "description": "The sharding strategy selected for the collection. _(cluster only)_\n\nPossible values:\n- `\"community-compat\"`\n- `\"enterprise-compat\"`\n- `\"enterprise-smart-edge-compat\"`\n- `\"hash\"`\n- `\"enterprise-hash-smart-edge\"`\n- `\"enterprise-hex-smart-vertex\"`\n",
            "type": "string"
           },
           "smartGraphAttribute": {
@@ -8479,13 +8384,7 @@
              "type": "integer"
             },
             "type": {
-             "description": "Specifies the type of the key generator.\n",
-             "enum": [
-              "traditional",
-              "autoincrement",
-              "uuid",
-              "padded"
-             ],
+             "description": "Specifies the type of the key generator. Possible values:\n- `\"traditional\"`\n- `\"autoincrement\"`\n- `\"uuid\"`\n- `\"padded\"`\n",
              "type": "string"
             }
            },
@@ -8523,15 +8422,7 @@
            "type": "array"
           },
           "shardingStrategy": {
-           "description": "The sharding strategy selected for the collection. _(cluster only)_\n",
-           "enum": [
-            "community-compat",
-            "enterprise-compat",
-            "enterprise-smart-edge-compat",
-            "hash",
-            "enterprise-hash-smart-edge",
-            "enterprise-hex-smart-vertex"
-           ],
+           "description": "The sharding strategy selected for the collection. _(cluster only)_\n\nPossible values:\n- `\"community-compat\"`\n- `\"enterprise-compat\"`\n- `\"enterprise-smart-edge-compat\"`\n- `\"hash\"`\n- `\"enterprise-hash-smart-edge\"`\n- `\"enterprise-hex-smart-vertex\"`\n",
            "type": "string"
           },
           "smartGraphAttribute": {
@@ -8972,43 +8863,7 @@
         }
        }
       },
-      "description": "The collection cannot be found.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "properties": {
-          "code": {
-           "description": "The HTTP response status code.\n",
-           "example": 410,
-           "type": "integer"
-          },
-          "error": {
-           "description": "A flag indicating that an error occurred.\n",
-           "example": true,
-           "type": "boolean"
-          },
-          "errorMessage": {
-           "description": "A descriptive error message.\n",
-           "type": "string"
-          },
-          "errorNum": {
-           "description": "ArangoDB error number for the error that occurred.\n",
-           "type": "integer"
-          }
-         },
-         "required": [
-          "error",
-          "code",
-          "errorNum",
-          "errorMessage"
-         ],
-         "type": "object"
-        }
-       }
-      },
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "A collection called `collection-name` could not be found.\n"
      }
     },
     "summary": "Truncate a collection",
@@ -9229,6 +9084,10 @@
           "description": "An object with key/value pairs representing the bind parameters.\nFor a bind variable `@var` in the query, specify the value using an attribute\nwith the name `var`. For a collection bind variable `@@coll`, use `@coll` as the\nattribute name. For example: `\"bindVars\": { \"var\": 42, \"@coll\": \"products\" }`.\n",
           "type": "object"
          },
+         "cache": {
+          "description": "flag to determine whether the AQL query results cache\nshall be used. If set to `false`, then any query cache lookup will be skipped\nfor the query. If set to `true`, it will lead to the query cache being checked\nfor the query if the query cache mode is either `on` or `demand`.\n",
+          "type": "boolean"
+         },
          "count": {
           "description": "indicates whether the number of documents in the result set should be returned in\nthe \"count\" attribute of the result.\nCalculating the \"count\" attribute might have a performance impact for some queries\nin the future so this option is turned off by default, and \"count\"\nis only returned when requested.\n",
           "type": "boolean"
@@ -9246,10 +9105,6 @@
            },
            "allowRetry": {
             "description": "Set this option to `true` to make it possible to retry\nfetching the latest batch from a cursor. The default is `false`.\n\nIf retrieving a result batch fails because of a connection issue, you can ask\nfor that batch again using the `POST /_api/cursor/\u003ccursor-id\u003e/\u003cbatch-id\u003e`\nendpoint. The first batch has an ID of `1` and the value is incremented by 1\nwith every batch. Every result response except the last one also includes a\n`nextBatchId` attribute, indicating the ID of the batch after the current.\nYou can remember and use this batch ID should retrieving the next batch fail.\n\nYou can only request the latest batch again (or the next batch).\nEarlier batches are not kept on the server-side.\nRequesting a batch again does not advance the cursor.\n\nYou can also call this endpoint with the next batch identifier, i.e. the value\nreturned in the `nextBatchId` attribute of a previous request. This advances the\ncursor and returns the results of the next batch. This is only supported if there\nare more results in the cursor (i.e. `hasMore` is `true` in the latest batch).\n\nFrom v3.11.1 onward, you may use the `POST /_api/cursor/\u003ccursor-id\u003e/\u003cbatch-id\u003e`\nendpoint even if the `allowRetry` attribute is `false` to fetch the next batch,\nbut you cannot request a batch again unless you set it to `true`.\n\nTo allow refetching of the very last batch of the query, the server cannot\nautomatically delete the cursor. After the first attempt of fetching the last\nbatch, the server would normally delete the cursor to free up resources. As you\nmight need to reattempt the fetch, it needs to keep the final batch when the\n`allowRetry` option is enabled. Once you successfully received the last batch,\nyou should call the `DELETE /_api/cursor/\u003ccursor-id\u003e` endpoint so that the\nserver doesn't unnecessarily keep the batch until the cursor times out\n(`ttl` query option).\n",
-            "type": "boolean"
-           },
-           "cache": {
-            "description": "Whether the [AQL query results cache](https://docs.arangodb.com/3.12/aql/execution-and-performance/caching-query-results/)\nshall be used for adding as well as for retrieving results.\n\nIf the query cache mode is set to `demand` and you set the `cache` query option\nto `true` for a query, then its query result is cached if it's eligible for\ncaching. If the query cache mode is set to `on`, query results are automatically\ncached if they are eligible for caching unless you set the `cache` option to `false`.\n\nIf you set the `cache` option to `false`, then any query cache lookup is skipped\nfor the query. If you set it to `true`, the query cache is checked for a cached result\n**if** the query cache mode is either set to `on` or `demand`.\n",
             "type": "boolean"
            },
            "failOnWarning": {
@@ -9310,7 +9165,7 @@
             "type": "object"
            },
            "profile": {
-            "description": "If set to `true` or `1`, then the additional query profiling information is returned\nin the `profile` sub-attribute of the `extra` return attribute, unless the query result\nis served from the query results cache. If set to `2`, the query includes execution stats\nper query plan node in `stats.nodes` sub-attribute of the `extra` return attribute.\nAdditionally, the query plan is returned in the `extra.plan` sub-attribute.\n",
+            "description": "If set to `true` or `1`, then the additional query profiling information is returned\nin the `profile` sub-attribute of the `extra` return attribute, unless the query result\nis served from the query cache. If set to `2`, the query includes execution stats\nper query plan node in `stats.nodes` sub-attribute of the `extra` return attribute.\nAdditionally, the query plan is returned in the `extra.plan` sub-attribute.\n",
             "type": "integer"
            },
            "satelliteSyncWait": {
@@ -9318,7 +9173,7 @@
             "type": "number"
            },
            "skipInaccessibleCollections": {
-            "description": "Let AQL queries (especially graph traversals) treat collections to which a user\nhas no access rights for as if these collections are empty. Instead of returning a\nforbidden access error, your queries execute normally. This is intended to help\nwith certain use-cases: A graph contains several collections and different users\nexecute AQL queries on that graph. You can naturally limit the accessible\nresults by changing the access rights of users on collections.\n\nThis feature is only available in the Enterprise Edition.\n",
+            "description": "Let AQL queries (especially graph traversals) treat collection to which a user\nhas no access rights for as if these collections are empty. Instead of returning a\nforbidden access error, your queries execute normally. This is intended to help\nwith certain use-cases: A graph contains several collections and different users\nexecute AQL queries on that graph. You can naturally limit the accessible\nresults by changing the access rights of users on collections.\n\nThis feature is only available in the Enterprise Edition.\n",
             "type": "boolean"
            },
            "spillOverThresholdMemoryUsage": {
@@ -9331,11 +9186,6 @@
            },
            "stream": {
             "description": "Can be enabled to execute the query lazily. If set to `true`, then the query is\nexecuted as long as necessary to produce up to `batchSize` results. These\nresults are returned immediately and the query is suspended until the client\nasks for the next batch (if there are more results). Depending on the query\nthis can mean that the first results will be available much faster and that\nless memory is needed because the server only needs to store a subset of\nresults at a time. Read-only queries can benefit the most, unless `SORT`\nwithout index or `COLLECT` are involved that make it necessary to process all\ndocuments before a partial result can be returned. It is advisable to only use\nthis option for queries without exclusive locks.\n\nRemarks:\n- The query will hold resources until it ends (such as RocksDB snapshots, which\n  prevents compaction to some degree). Writes will be in memory until the query\n  is committed.\n- If existing documents are modified, then write locks are held on these\n  documents and other queries trying to modify the same documents will fail\n  because of this conflict.\n- A streaming query may fail late because of a conflict or for other reasons\n  after some batches were already returned successfully, possibly rendering the\n  results up to that point meaningless.\n- The query options `cache`, `count` and `fullCount` are not supported for\n  streaming queries.\n- Query statistics, profiling data and warnings are delivered as part of the\n  last batch.\n\nIf the `stream` option is `false` (default), then the complete result of the\nquery is calculated before any of it is returned to the client. The server\nstores the full result in memory (on the contacted Coordinator if in a cluster).\nAll other resources are freed immediately (locks, RocksDB snapshots). The query\nwill fail before it returns results in case of a conflict.\n",
-            "type": "boolean"
-           },
-           "usePlanCache": {
-            "default": false,
-            "description": "Set this option to `true` to utilize a cached query plan or add the execution plan\nof this query to the cache if it's not in the cache yet. Otherwise, the plan cache\nis bypassed (introduced in v3.12.4).\n\nQuery plan caching can reduce the total time for processing queries by avoiding\nto parse, plan, and optimize queries over and over again that effectively have\nthe same execution plan with at most some changes to bind parameter values.\n\nAn error is raised if a query doesn't meet the requirements for plan caching.\nSee [Cache eligibility](https://docs.arangodb.com/3.12/aql/execution-and-performance/caching-query-plans/#cache-eligibility)\nfor details.\n",
             "type": "boolean"
            }
           },
@@ -9365,7 +9215,7 @@
         "schema": {
          "properties": {
           "cached": {
-           "description": "A boolean flag indicating whether the query result was served\nfrom the query results cache or not. If the query result is served from the query\ncache, the `extra` attribute in the response does not contain the `stats`\nand `profile` sub-attributes.\n",
+           "description": "A boolean flag indicating whether the query result was served\nfrom the query cache or not. If the query result is served from the query\ncache, the `extra` return attribute will not contain any `stats` sub-attribute\nand no `profile` sub-attribute.\n",
            "type": "boolean"
           },
           "code": {
@@ -9395,12 +9245,7 @@
                   "type": "string"
                  },
                  "type": {
-                  "description": "How the collection is used.\n",
-                  "enum": [
-                   "read",
-                   "write",
-                   "exclusive"
-                  ],
+                  "description": "How the collection is used. Can be `\"read\"`, `\"write\"`, or `\"exclusive\"`.\n",
                   "type": "string"
                  }
                 },
@@ -9666,10 +9511,6 @@
           },
           "nextBatchId": {
            "description": "Only set if the `allowRetry` query option is enabled in v3.11.0.\nFrom v3.11.1 onward, this attribute is always set, except in the last batch.\n\nThe ID of the batch after the current one. The first batch has an ID of `1` and\nthe value is incremented by 1 with every batch. You can remember and use this\nbatch ID should retrieving the next batch fail. Use the\n`POST /_api/cursor/\u003ccursor-id\u003e/\u003cbatch-id\u003e` endpoint to ask for the batch again.\nYou can also request the next batch.\n",
-           "type": "string"
-          },
-          "planCacheKey": {
-           "description": "The key of the plan cache entry. This attribute is only\npresent if a cached query execution plan has been used.\n",
            "type": "string"
           },
           "result": {
@@ -9724,19 +9565,19 @@
         }
        }
       },
-      "description": "The JSON representation is malformed, the query specification is\nmissing from the request, or the query is invalid.\n\nThe body of the response contains a JSON object with additional error\ndetails.\n"
+      "description": "is returned if the JSON representation is malformed, the query specification is\nmissing from the request, or if the query is invalid.\n\nThe body of the response contains a JSON object with additional error\ndetails. The object has the following attributes:\n"
      },
      "404": {
-      "description": "A non-existing collection is accessed in the query.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
+      "description": "The server will respond with *HTTP 404* in case a non-existing collection is\naccessed in the query.\n"
      },
      "405": {
-      "description": "An unsupported HTTP method is used.\n"
+      "description": "The server will respond with *HTTP 405* if an unsupported HTTP method is used.\n"
      },
      "410": {
-      "description": "A server which processes the query or the leader of a shard which is used\nin the query stops responding, but the connection has not been closed.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "The server will respond with *HTTP 410* if a server which processes the query\nor is the leader for a shard which is used in the query stops responding, but\nthe connection has not been closed.\n"
      },
      "503": {
-      "description": "A server which processes the query or the leader of a shard which is used\nin the query is down, either for going through a restart, a failure, or\nconnectivity issues.\n"
+      "description": "The server will respond with *HTTP 503* if a server which processes the query\nor is the leader for a shard which is used in the query is down, either for\ngoing through a restart, a failure or connectivity issues.\n"
      }
     },
     "summary": "Create a cursor",
@@ -9747,7 +9588,7 @@
   },
   "/_db/{database-name}/_api/cursor/{cursor-identifier}": {
    "delete": {
-    "description": "Deletes the cursor and frees the resources associated with it.\n\nThe cursor will automatically be destroyed on the server when the client has\nretrieved all documents from it. The client can also explicitly destroy the\ncursor at any earlier time using an HTTP DELETE request. The cursor identifier must\nbe included as part of the URL.\n\nNote: the server will also destroy abandoned cursors automatically after a\ncertain server-controlled timeout to avoid resource leakage.\n",
+    "description": "Deletes the cursor and frees the resources associated with it.\n\nThe cursor will automatically be destroyed on the server when the client has\nretrieved all documents from it. The client can also explicitly destroy the\ncursor at any earlier time using an HTTP DELETE request. The cursor id must\nbe included as part of the URL.\n\nNote: the server will also destroy abandoned cursors automatically after a\ncertain server-controlled timeout to avoid resource leakage.\n",
     "operationId": "deleteAqlQueryCursor",
     "parameters": [
      {
@@ -9761,7 +9602,7 @@
       }
      },
      {
-      "description": "The identifier of the cursor\n",
+      "description": "The id of the cursor\n",
       "in": "path",
       "name": "cursor-identifier",
       "required": true,
@@ -9772,10 +9613,10 @@
     ],
     "responses": {
      "202": {
-      "description": "The server is aware of the cursor.\n"
+      "description": "is returned if the server is aware of the cursor.\n"
      },
      "404": {
-      "description": "The server is not aware of the cursor. This is also\nreturned if a cursor is used after it has been destroyed.\n"
+      "description": "is returned if the server is not aware of the cursor. It is also\nreturned if a cursor is used after it has been destroyed.\n"
      }
     },
     "summary": "Delete a cursor",
@@ -9814,7 +9655,7 @@
         "schema": {
          "properties": {
           "cached": {
-           "description": "A boolean flag indicating whether the query result was served\nfrom the query results cache or not. If the query result is served from the query\ncache, the `extra` attribute in the response does not contain the `stats`\nand `profile` sub-attributes.\n",
+           "description": "A boolean flag indicating whether the query result was served\nfrom the query cache or not. If the query result is served from the query\ncache, the `extra` return attribute will not contain any `stats` sub-attribute\nand no `profile` sub-attribute.\n",
            "type": "boolean"
           },
           "code": {
@@ -9844,12 +9685,7 @@
                   "type": "string"
                  },
                  "type": {
-                  "description": "How the collection is used.\n",
-                  "enum": [
-                   "read",
-                   "write",
-                   "exclusive"
-                  ],
+                  "description": "How the collection is used. Can be `\"read\"`, `\"write\"`, or `\"exclusive\"`.\n",
                   "type": "string"
                  }
                 },
@@ -9863,7 +9699,7 @@
               },
               "estimatedCost": {
                "description": "The estimated cost of the query.\n",
-               "type": "number"
+               "type": "integer"
               },
               "estimatedNrItems": {
                "description": "The estimated number of results.\n",
@@ -10117,10 +9953,6 @@
            "description": "Only set if the `allowRetry` query option is enabled in v3.11.0.\nFrom v3.11.1 onward, this attribute is always set, except in the last batch.\n\nThe ID of the batch after the current one. The first batch has an ID of `1` and\nthe value is incremented by 1 with every batch. You can remember and use this\nbatch ID should retrieving the next batch fail. Use the\n`POST /_api/cursor/\u003ccursor-id\u003e/\u003cbatch-id\u003e` endpoint to ask for the batch again.\nYou can also request the next batch.\n",
            "type": "string"
           },
-          "planCacheKey": {
-           "description": "The key of the plan cache entry. This attribute is only\npresent if a cached query execution plan has been used.\n",
-           "type": "string"
-          },
           "result": {
            "description": "An array of result documents for the current batch\n(might be empty if the query has no results).\n",
            "items": {
@@ -10139,19 +9971,19 @@
         }
        }
       },
-      "description": "Successfully fetched the batch.\n"
+      "description": "The server will respond with *HTTP 200* in case of success.\n"
      },
      "400": {
-      "description": "The cursor identifier is missing.\n"
+      "description": "If the cursor identifier is omitted, the server will respond with *HTTP 404*.\n"
      },
      "404": {
-      "description": "A cursor with the specified identifier cannot found.\n"
+      "description": "If no cursor with the specified identifier can be found, the server will respond\nwith *HTTP 404*.\n"
      },
      "410": {
-      "description": "A server which processes the query or the leader of a shard which is\nused in the query stops responding, but the connection has not been closed.\n"
+      "description": "The server will respond with *HTTP 410* if a server which processes the query\nor is the leader for a shard which is used in the query stops responding, but\nthe connection has not been closed.\n"
      },
      "503": {
-      "description": "A server which processes the query or the leader of a shard which is used\nin the query is down, either for going through a restart, a failure,\nor connectivity issues.\n"
+      "description": "The server will respond with *HTTP 503* if a server which processes the query\nor is the leader for a shard which is used in the query is down, either for\ngoing through a restart, a failure or connectivity issues.\n"
      }
     },
     "summary": "Read the next batch from a cursor",
@@ -10185,19 +10017,19 @@
     ],
     "responses": {
      "200": {
-      "description": "Successfully fetched the batch.\n"
+      "description": "The server will respond with *HTTP 200* in case of success.\n"
      },
      "400": {
-      "description": "The cursor identifier is missing.\n"
+      "description": "If the cursor identifier is omitted, the server will respond with *HTTP 404*.\n"
      },
      "404": {
-      "description": "A cursor with the specified identifier cannot be found.\n"
+      "description": "If no cursor with the specified identifier can be found, the server will respond\nwith *HTTP 404*.\n"
      },
      "410": {
-      "description": "A server which processes the query or the leader of a shard which is\nused in the query stops responding, but the connection has not been closed.\n"
+      "description": "The server will respond with *HTTP 410* if a server which processes the query\nor is the leader for a shard which is used in the query stops responding, but\nthe connection has not been closed.\n"
      },
      "503": {
-      "description": "A server which processes the query or the leader of a shard which is used\nin the query is down, either for going through a restart, a failure,\nor connectivity issues.\n"
+      "description": "The server will respond with *HTTP 503* if a server which processes the query\nor is the leader for a shard which is used in the query is down, either for\ngoing through a restart, a failure or connectivity issues.\n"
      }
     },
     "summary": "Read the next batch from a cursor (deprecated)",
@@ -10247,7 +10079,7 @@
         "schema": {
          "properties": {
           "cached": {
-           "description": "A boolean flag indicating whether the query result was served\nfrom the query results cache or not. If the query result is served from the query\ncache, the `extra` attribute in the response does not contain the `stats`\nand `profile` sub-attributes.\n",
+           "description": "A boolean flag indicating whether the query result was served\nfrom the query cache or not. If the query result is served from the query\ncache, the `extra` return attribute will not contain any `stats` sub-attribute\nand no `profile` sub-attribute.\n",
            "type": "boolean"
           },
           "code": {
@@ -10277,12 +10109,7 @@
                   "type": "string"
                  },
                  "type": {
-                  "description": "How the collection is used.\n",
-                  "enum": [
-                   "read",
-                   "write",
-                   "exclusive"
-                  ],
+                  "description": "How the collection is used. Can be `\"read\"`, `\"write\"`, or `\"exclusive\"`.\n",
                   "type": "string"
                  }
                 },
@@ -10296,7 +10123,7 @@
               },
               "estimatedCost": {
                "description": "The estimated cost of the query.\n",
-               "type": "number"
+               "type": "integer"
               },
               "estimatedNrItems": {
                "description": "The estimated number of results.\n",
@@ -10548,10 +10375,6 @@
           },
           "nextBatchId": {
            "description": "Only set if the `allowRetry` query option is enabled in v3.11.0.\nFrom v3.11.1 onward, this attribute is always set, except in the last batch.\n\nThe ID of the batch after the current one. The first batch has an ID of `1` and\nthe value is incremented by 1 with every batch. You can remember and use this\nbatch ID should retrieving the next batch fail. Use the\n`POST /_api/cursor/\u003ccursor-id\u003e/\u003cbatch-id\u003e` endpoint to ask for the batch again.\nYou can also request the next batch.\n",
-           "type": "string"
-          },
-          "planCacheKey": {
-           "description": "The key of the plan cache entry. This attribute is only\npresent if a cached query execution plan has been used.\n",
            "type": "string"
           },
           "result": {
@@ -10606,10 +10429,10 @@
         }
        }
       },
-      "description": "The cursor and the batch identifier are missing.\n"
+      "description": "If the cursor and the batch identifier are omitted, the server responds with\n*HTTP 400*.\n"
      },
      "404": {
-      "description": "A cursor with the specified identifier cannot be found, or the requested\nbatch isn't available.\n"
+      "description": "If no cursor with the specified identifier can be found, or if the requested\nbatch isn't available, the server responds with *HTTP 404*.\n"
      },
      "410": {
       "description": "The server responds with *HTTP 410* if a server which processes the query\nor is the leader for a shard which is used in the query stops responding, but\nthe connection has not been closed.\n"
@@ -10778,22 +10601,19 @@
     },
     "responses": {
      "200": {
-      "description": "The individual operations have been processed and `waitForSync` was `true`.\n"
+      "description": "is returned if `waitForSync` was `true`.\n"
      },
      "202": {
-      "description": "The individual operations have been processed and `waitForSync` was `false`.\n"
+      "description": "is returned if `waitForSync` was `false`.\n"
      },
      "403": {
-      "description": "If the error code is `1004`, the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "with the error code `1004` is returned if the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      },
      "404": {
-      "description": "The collection cannot be found.\nThe response body contains an error document in this case.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "is returned if the collection was not found.\nThe response body contains an error document in this case.\n"
      },
      "503": {
-      "description": "The system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "is returned if the system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      }
     },
     "summary": "Remove multiple documents",
@@ -10930,25 +10750,22 @@
     },
     "responses": {
      "201": {
-      "description": "The individual operations have been processed and `waitForSync` was `true`.\n"
+      "description": "is returned if `waitForSync` was `true` and operations were processed.\n"
      },
      "202": {
-      "description": "The individual operations have been processed and `waitForSync` was `false`.\n"
+      "description": "is returned if `waitForSync` was `false` and operations were processed.\n"
      },
      "400": {
-      "description": "The request body does not contain a valid JSON representation\nof an array of documents.\n"
+      "description": "is returned if the body does not contain a valid JSON representation\nof an array of documents. The response body contains\nan error document in this case.\n"
      },
      "403": {
-      "description": "If the error code is `1004`, the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "with the error code `1004` is returned if the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      },
      "404": {
-      "description": "The collection cannot be found.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "is returned if the collection was not found.\n"
      },
      "503": {
-      "description": "The system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "is returned if the system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      }
     },
     "summary": "Update multiple documents",
@@ -11091,28 +10908,25 @@
     },
     "responses": {
      "201": {
-      "description": "The document has been created successfully and\n`waitForSync` was `true`.\n"
+      "description": "is returned if the documents were created successfully and\n`waitForSync` was `true`.\n"
      },
      "202": {
-      "description": "The document has been created successfully and\n`waitForSync` was `false`.\n"
+      "description": "is returned if the documents were created successfully and\n`waitForSync` was `false`.\n"
      },
      "400": {
-      "description": "The request body does not contain a valid JSON representation\nof a document. The response body contains\nan error document in this case.\n"
+      "description": "is returned if the body does not contain a valid JSON representation\nof one document. The response body contains\nan error document in this case.\n"
      },
      "403": {
-      "description": "If the error code is `1004`, the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "with the error code `1004` is returned if the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      },
      "404": {
-      "description": "The collection cannot be found.\nThe response body contains an error document in this case.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
+      "description": "is returned if the collection specified by `collection` is unknown.\nThe response body contains an error document in this case.\n"
      },
      "409": {
       "description": "There are two possible reasons for this error in the single document case:\n\n- A document with the same qualifiers in an indexed attribute conflicts with an\n  already existing document and thus violates the unique constraint.\n  The response body contains an error document with the `errorNum` set to\n  `1210` (`ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED`) in this case.\n- Locking the document key or some unique index entry failed to due to another\n  concurrent operation that operates on the same document. This is also referred\n  to as a _write-write conflict_. The response body contains an error document\n  with the `errorNum` set to `1200` (`ERROR_ARANGO_CONFLICT`) in this case.\n"
      },
-     "410": {
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
-     },
      "503": {
-      "description": "The system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "is returned if the system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      }
     },
     "summary": "Create a document",
@@ -11231,25 +11045,22 @@
     },
     "responses": {
      "201": {
-      "description": "The individual operations have been processed and `waitForSync` was `true`.\n"
+      "description": "is returned if `waitForSync` was `true` and operations were processed.\n"
      },
      "202": {
-      "description": "The individual operations have been processed and `waitForSync` was `false`.\n"
+      "description": "is returned if `waitForSync` was `false` and operations were processed.\n"
      },
      "400": {
-      "description": "The request body does not contain a valid JSON representation\nof an array of documents.\n"
+      "description": "is returned if the body does not contain a valid JSON representation\nof an array of documents. The response body contains\nan error document in this case.\n"
      },
      "403": {
-      "description": "If the error code is `1004`, the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "with the error code `1004` is returned if the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      },
      "404": {
-      "description": "The collection cannot be found.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "is returned if the collection was not found.\n"
      },
      "503": {
-      "description": "The system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "is returned if the system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      }
     },
     "summary": "Replace multiple documents",
@@ -11335,16 +11146,13 @@
     },
     "responses": {
      "200": {
-      "description": "No error occurred for the overall operation.\n"
+      "description": "is returned if no error happened\n"
      },
      "400": {
-      "description": "The request body does not contain a valid JSON representation\nof an array of documents.\n"
+      "description": "is returned if the body does not contain a valid JSON representation\nof an array of documents. The response body contains\nan error document in this case.\n"
      },
      "404": {
-      "description": "The collection cannot be found.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "is returned if the collection was not found.\n"
      }
     },
     "summary": "Get multiple documents",
@@ -11492,25 +11300,22 @@
     },
     "responses": {
      "201": {
-      "description": "The individual operations have been processed and `waitForSync` was `true`.\n"
+      "description": "is returned if `waitForSync` was `true` and operations were processed.\n"
      },
      "202": {
-      "description": "The individual operations have been processed and `waitForSync` was `false`.\n"
+      "description": "is returned if `waitForSync` was `false` and operations were processed.\n"
      },
      "400": {
-      "description": "The request body does not contain a valid JSON representation\nof an array of documents.\n"
+      "description": "is returned if the body does not contain a valid JSON representation\nof an array of documents. The response body contains\nan error document in this case.\n"
      },
      "403": {
-      "description": "If the error code is `1004`, the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "with the error code `1004` is returned if the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      },
      "404": {
-      "description": "The document or collection cannot be found.\nThe response body contains an error document in this case.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "is returned if the collection specified by `collection` is unknown.\nThe response body contains an error document in this case.\n"
      },
      "503": {
-      "description": "The system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "is returned if the system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      }
     },
     "summary": "Create multiple documents",
@@ -11609,28 +11414,25 @@
     ],
     "responses": {
      "200": {
-      "description": "The document has been removed successfully and\n`waitForSync` was `true`.\n"
+      "description": "is returned if the document was removed successfully and\n`waitForSync` was `true`.\n"
      },
      "202": {
-      "description": "The document has been removed successfully and\n`waitForSync` was `false`.\n"
+      "description": "is returned if the document was removed successfully and\n`waitForSync` was `false`.\n"
      },
      "403": {
-      "description": "If the error code is `1004`, the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "with the error code `1004` is returned if the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      },
      "404": {
-      "description": "The document or collection cannot be found.\nThe response body contains an error document in this case.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
+      "description": "is returned if the collection or the document was not found.\nThe response body contains an error document in this case.\n"
      },
      "409": {
-      "description": "Locking the document key failed due to another\nconcurrent operation that operates on the same document.\nThis is also referred to as a _write-write conflict_.\nThe response body contains an error document with the\n`errorNum` set to `1200` (`ERROR_ARANGO_CONFLICT`) in this case.\n"
-     },
-     "410": {
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "is returned if locking the document key failed due to another\nconcurrent operation that operates on the same document.\nThis is also referred to as a _write-write conflict_.\nThe response body contains an error document with the\n`errorNum` set to `1200` (`ERROR_ARANGO_CONFLICT`) in this case.\n"
      },
      "412": {
-      "description": "An `If-Match` header is specified and the found\ndocument has a different version. The response includes the found\ndocument's current revision in the `_rev` attribute. Additionally, the\nattributes `_id` and `_key` are returned.\n"
+      "description": "is returned if a \"If-Match\" header or `rev` is given and the found\ndocument has a different version. The response also contain the found\ndocument's current revision in the `_rev` attribute. Additionally, the\nattributes `_id` and `_key` are returned.\n"
      },
      "503": {
-      "description": "The system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "is returned if the system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      }
     },
     "summary": "Remove a document",
@@ -11709,19 +11511,16 @@
     ],
     "responses": {
      "200": {
-      "description": "The document has been found.\n"
+      "description": "is returned if the document was found\n"
      },
      "304": {
-      "description": "The `If-None-Match` header is specified and the document\nhas the same revision.\n"
+      "description": "is returned if the \"If-None-Match\" header is given and the document has\nthe same version\n"
      },
      "404": {
-      "description": "The document or collection cannot be found.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "is returned if the document or collection was not found\n"
      },
      "412": {
-      "description": "An `If-Match` header is specified and the found\ndocument has a different revision. The response includes the found\ndocument's current revision in the `_rev` attribute. Additionally, the\n`_id` and `_key` attributes are returned.\n"
+      "description": "is returned if an \"If-Match\" header is given and the found\ndocument has a different version. The response will also contain the found\ndocument's current revision in the `_rev` attribute. Additionally, the\nattributes `_id` and `_key` will be returned.\n"
      }
     },
     "summary": "Get a document",
@@ -11800,19 +11599,16 @@
     ],
     "responses": {
      "200": {
-      "description": "The document has been found.\n"
+      "description": "is returned if the document was found\n"
      },
      "304": {
-      "description": "An `If-None-Match` header is specified and the document has\nthe same version.\n"
+      "description": "is returned if the \"If-None-Match\" header is given and the document has\nthe same version\n"
      },
      "404": {
-      "description": "The document or collection cannot be found.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "is returned if the document or collection was not found\n"
      },
      "412": {
-      "description": "An `If-Match` header is given and the found\ndocument has a different version. The response includes the found\ndocument's current revision in the `ETag` header.\n"
+      "description": "is returned if an \"If-Match\" header is given and the found\ndocument has a different version. The response will also contain the found\ndocument's current revision in the `ETag` header.\n"
      }
     },
     "summary": "Get a document header",
@@ -11964,31 +11760,28 @@
     },
     "responses": {
      "201": {
-      "description": "The document has been updated successfully and\n`waitForSync` was `true`.\n"
+      "description": "is returned if the document was updated successfully and\n`waitForSync` was `true`.\n"
      },
      "202": {
-      "description": "The document has been updated successfully and\n`waitForSync` was `false`.\n"
+      "description": "is returned if the document was updated successfully and\n`waitForSync` was `false`.\n"
      },
      "400": {
-      "description": "The request body does not contain a valid JSON representation\nof a document. The response body contains\nan error document in this case.\n"
+      "description": "is returned if the body does not contain a valid JSON representation\nof a document. The response body contains\nan error document in this case.\n"
      },
      "403": {
-      "description": "If the error code is `1004`, the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "with the error code `1004` is returned if the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      },
      "404": {
-      "description": "The document or collection cannot be found.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
+      "description": "is returned if the collection or the document was not found.\n"
      },
      "409": {
       "description": "There are two possible reasons for this error:\n\n- The update causes a unique constraint violation in a secondary index.\n  The response body contains an error document with the `errorNum` set to\n  `1210` (`ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED`) in this case.\n- Locking the document key or some unique index entry failed due to another\n  concurrent operation that operates on the same document. This is also referred\n  to as a _write-write conflict_. The response body contains an error document\n  with the `errorNum` set to `1200` (`ERROR_ARANGO_CONFLICT`) in this case.\n"
      },
-     "410": {
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
-     },
      "412": {
-      "description": "The precondition was violated. The response also contains\nthe found documents' current revisions in the `_rev` attributes.\nAdditionally, the attributes `_id` and `_key` are returned.\n"
+      "description": "is returned if the precondition was violated. The response also contains\nthe found documents' current revisions in the `_rev` attributes.\nAdditionally, the attributes `_id` and `_key` are returned.\n"
      },
      "503": {
-      "description": "The system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "is returned if the system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      }
     },
     "summary": "Update a document",
@@ -12122,31 +11915,28 @@
     },
     "responses": {
      "201": {
-      "description": "The document has been replaced successfully and\n`waitForSync` was `true`.\n"
+      "description": "is returned if the document was replaced successfully and\n`waitForSync` was `true`.\n"
      },
      "202": {
-      "description": "The document has been replaced successfully and\n`waitForSync` was `false`.\n"
+      "description": "is returned if the document was replaced successfully and\n`waitForSync` was `false`.\n"
      },
      "400": {
-      "description": "The request body does not contain a valid JSON representation\nof a document. The response body contains\nan error document in this case.\n"
+      "description": "is returned if the body does not contain a valid JSON representation\nof a document. The response body contains\nan error document in this case.\n"
      },
      "403": {
-      "description": "If the error code is `1004`, the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "with the error code `1004` is returned if the specified write concern for the\ncollection cannot be fulfilled. This can happen if less than the number of\nspecified replicas for a shard are currently in-sync with the leader. For example,\nif the write concern is `2` and the replication factor is `3`, then the\nwrite concern is not fulfilled if two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      },
      "404": {
-      "description": "The collection or the document was not found.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
+      "description": "is returned if the collection or the document was not found.\n"
      },
      "409": {
       "description": "There are two possible reasons for this error:\n\n- The replace operation causes a unique constraint violation in a secondary\n  index. The response body contains an error document with the `errorNum` set to\n  `1210` (`ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED`) in this case.\n- Locking the document key or some unique index entry failed due to another\n  concurrent operation that operates on the same document. This is also referred\n  to as a _write-write conflict_. The response body contains an error document\n  with the `errorNum` set to `1200` (`ERROR_ARANGO_CONFLICT`) in this case.\n"
      },
-     "410": {
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
-     },
      "412": {
-      "description": "The precondition is violated. The response includes\nthe found documents' current revisions in the `_rev` attributes.\nAdditionally, the attributes `_id` and `_key` are returned.\n"
+      "description": "is returned if the precondition is violated. The response also contains\nthe found documents' current revisions in the `_rev` attributes.\nAdditionally, the attributes `_id` and `_key` are returned.\n"
      },
      "503": {
-      "description": "The system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
+      "description": "is returned if the system is temporarily not available. This can be a system\noverload or temporary failure. In this case it makes sense to retry the request\nlater.\n\nIf the error code is `1429`, then the write concern for the collection cannot be\nfulfilled. This can happen if less than the number of specified replicas for\na shard are currently in-sync with the leader. For example, if the write concern\nis `2` and the replication factor is `3`, then the write concern is not fulfilled\nif two replicas are not in-sync.\n\nNote that the HTTP status code is configurable via the\n`--cluster.failed-write-concern-status-code` startup option. It defaults to `403`\nbut can be changed to `503` to signal client applications that it is a\ntemporary error.\n"
      }
     },
     "summary": "Replace a document",
@@ -12299,24 +12089,8 @@
             "description": "if set to `true`, all possible execution plans will be returned.\nThe default is `false`, meaning only the optimal plan will be returned.\n",
             "type": "boolean"
            },
-           "failOnWarning": {
-            "description": "If set to `true`, the query throws an exception and aborts instead of producing\na warning. You should use this option during development to catch potential issues\nearly. When the attribute is set to `false`, warnings are not propagated to\nexceptions and are returned with the query result.\n\nYou can use the `--query.fail-on-warning` startup option to adjust the\ndefault value for `failOnWarning` so you don't need to set it on a per-query basis.\n",
-            "type": "boolean"
-           },
-           "fullCount": {
-            "description": "Whether to calculate the total number of documents matching the\nfilter conditions as if the query's final top-level `LIMIT` operation\nwere not applied. This option generally leads to different\nexecution plans.\n",
-            "type": "boolean"
-           },
-           "maxNodesPerCallstack": {
-            "description": "The number of execution nodes in the query plan after that stack splitting is\nperformed to avoid a potential stack overflow. Defaults to the configured value\nof the startup option `--query.max-nodes-per-callstack`.\n\nThis option is only useful for testing and debugging and normally does not need\nany adjustment.\n",
-            "type": "integer"
-           },
            "maxNumberOfPlans": {
-            "description": "The maximum number of plans that the optimizer is allowed to\ngenerate. Setting this attribute to a low value allows to put a\ncap on the amount of work the optimizer does.\n",
-            "type": "integer"
-           },
-           "maxWarningCount": {
-            "description": "Limits the number of warnings a query can return. The maximum number of warnings\nis `10` by default but you can increase or decrease the limit.\n",
+            "description": "an optional maximum number of plans that the optimizer is\nallowed to generate. Setting this attribute to a low value allows to put a\ncap on the amount of work the optimizer does.\n",
             "type": "integer"
            },
            "optimizer": {
@@ -12331,15 +12105,6 @@
              }
             },
             "type": "object"
-           },
-           "profile": {
-            "description": "Whether to include additional query profiling information.\nIf set to `2`, the response includes the time it took to process\neach optimizer rule under `stats.rules`.\n",
-            "type": "integer"
-           },
-           "usePlanCache": {
-            "default": false,
-            "description": "Set this option to `true` to utilize a cached query plan or add the execution plan\nof this query to the cache if it's not in the cache yet. Otherwise, the plan cache\nis bypassed (introduced in v3.12.4).\n\nQuery plan caching can reduce the total time for processing queries by avoiding\nto parse, plan, and optimize queries over and over again that effectively have\nthe same execution plan with at most some changes to bind parameter values.\n\nAn error is raised if a query doesn't meet the requirements for plan caching.\nSee [Cache eligibility](https://docs.arangodb.com/3.12/aql/execution-and-performance/caching-query-plans/#cache-eligibility)\nfor details.\n",
-            "type": "boolean"
            }
           },
           "type": "object"
@@ -12362,10 +12127,10 @@
       "description": "If the query is valid, the server will respond with *HTTP 200* and\nreturn the optimal execution plan in the `plan` attribute of the response.\nIf option `allPlans` was set in the request, an array of plans will be returned\nin the `allPlans` attribute instead.\n"
      },
      "400": {
-      "description": "The request is malformed or the query contains a parse error.\nThe body of the response contains the error details embedded in a JSON object.\nOmitting bind variables if the query references any also results\nan error.\n"
+      "description": "The server will respond with *HTTP 400* in case of a malformed request,\nor if the query contains a parse error. The body of the response will\ncontain the error details embedded in a JSON object.\nOmitting bind variables if the query references any will also result\nin an *HTTP 400* error.\n"
      },
      "404": {
-      "description": "A non-existing collection is accessed in the query.\n"
+      "description": "The server will respond with *HTTP 404* in case a non-existing collection is\naccessed in the query.\n"
      }
     },
     "summary": "Explain an AQL query",
@@ -15613,43 +15378,7 @@
         }
        }
       },
-      "description": "Returned in any of the following cases:\n- The graph cannot be found.\n- The edge collection is not part of the graph.\n- The vertex collection referenced in the `_from` or `_to` attribute is not part of the graph.\n- The vertex collection is part of the graph, but does not exist.\n- `_from` or `_to` vertex does not exist.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "properties": {
-          "code": {
-           "description": "The HTTP response status code.\n",
-           "example": 410,
-           "type": "integer"
-          },
-          "error": {
-           "description": "A flag indicating that an error occurred.\n",
-           "example": true,
-           "type": "boolean"
-          },
-          "errorMessage": {
-           "description": "A descriptive error message.\n",
-           "type": "string"
-          },
-          "errorNum": {
-           "description": "The ArangoDB error number for the error that occurred.\n",
-           "type": "integer"
-          }
-         },
-         "required": [
-          "error",
-          "code",
-          "errorNum",
-          "errorMessage"
-         ],
-         "type": "object"
-        }
-       }
-      },
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "Returned in any of the following cases:\n- No graph with this name can be found.\n- The edge collection is not part of the graph.\n- The vertex collection referenced in the `_from` or `_to` attribute is not part of the graph.\n- The vertex collection is part of the graph, but does not exist.\n- `_from` or `_to` vertex does not exist.\n"
      }
     },
     "summary": "Create an edge",
@@ -16397,43 +16126,7 @@
         }
        }
       },
-      "description": "Returned in the following cases:\n- The graph cannot be found.\n- The collection is not part of the graph.\n- The edge to remove does not exist.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "properties": {
-          "code": {
-           "description": "The HTTP response status code.\n",
-           "example": 410,
-           "type": "integer"
-          },
-          "error": {
-           "description": "A flag indicating that an error occurred.\n",
-           "example": true,
-           "type": "boolean"
-          },
-          "errorMessage": {
-           "description": "A descriptive error message.\n",
-           "type": "string"
-          },
-          "errorNum": {
-           "description": "The ArangoDB error number for the error that occurred.\n",
-           "type": "integer"
-          }
-         },
-         "required": [
-          "error",
-          "code",
-          "errorNum",
-          "errorMessage"
-         ],
-         "type": "object"
-        }
-       }
-      },
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "Returned in the following cases:\n- No graph with this name can be found.\n- This collection is not part of the graph.\n- The edge to remove does not exist.\n"
      },
      "412": {
       "content": {
@@ -16722,43 +16415,7 @@
         }
        }
       },
-      "description": "Returned in the following cases:\n- The graph cannot be found.\n- The collection is not part of the graph.\n- The edge does not exist.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "properties": {
-          "code": {
-           "description": "The HTTP response status code.\n",
-           "example": 410,
-           "type": "integer"
-          },
-          "error": {
-           "description": "A flag indicating that an error occurred.\n",
-           "example": true,
-           "type": "boolean"
-          },
-          "errorMessage": {
-           "description": "A descriptive error message.\n",
-           "type": "string"
-          },
-          "errorNum": {
-           "description": "The ArangoDB error number for the error that occurred.\n",
-           "type": "integer"
-          }
-         },
-         "required": [
-          "error",
-          "code",
-          "errorNum",
-          "errorMessage"
-         ],
-         "type": "object"
-        }
-       }
-      },
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "Returned in the following cases:\n- No graph with this name can be found.\n- This collection is not part of the graph.\n- The edge does not exist.\n"
      },
      "412": {
       "content": {
@@ -17239,43 +16896,7 @@
         }
        }
       },
-      "description": "Returned in the following cases:\n- The graph cannot be found.\n- The collection is not part of the graph.\n- The edge to update does not exist.\n- Either `_from` or `_to` vertex does not exist (if updated).\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "properties": {
-          "code": {
-           "description": "The HTTP response status code.\n",
-           "example": 410,
-           "type": "integer"
-          },
-          "error": {
-           "description": "A flag indicating that an error occurred.\n",
-           "example": true,
-           "type": "boolean"
-          },
-          "errorMessage": {
-           "description": "A descriptive error message.\n",
-           "type": "string"
-          },
-          "errorNum": {
-           "description": "The ArangoDB error number for the error that occurred.\n",
-           "type": "integer"
-          }
-         },
-         "required": [
-          "error",
-          "code",
-          "errorNum",
-          "errorMessage"
-         ],
-         "type": "object"
-        }
-       }
-      },
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "Returned in the following cases:\n- No graph with this name can be found.\n- This collection is not part of the graph.\n- The edge to update does not exist.\n- Either `_from` or `_to` vertex does not exist (if updated).\n"
      },
      "412": {
       "content": {
@@ -17761,43 +17382,7 @@
         }
        }
       },
-      "description": "Returned in the following cases:\n- The graph cannot be found.\n- The collection is not part of the graph.\n- The edge to replace does not exist.\n- Either `_from` or `_to` vertex does not exist.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "properties": {
-          "code": {
-           "description": "The HTTP response status code.\n",
-           "example": 410,
-           "type": "integer"
-          },
-          "error": {
-           "description": "A flag indicating that an error occurred.\n",
-           "example": true,
-           "type": "boolean"
-          },
-          "errorMessage": {
-           "description": "A descriptive error message.\n",
-           "type": "string"
-          },
-          "errorNum": {
-           "description": "The ArangoDB error number for the error that occurred.\n",
-           "type": "integer"
-          }
-         },
-         "required": [
-          "error",
-          "code",
-          "errorNum",
-          "errorMessage"
-         ],
-         "type": "object"
-        }
-       }
-      },
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "Returned in the following cases:\n- No graph with this name can be found.\n- This collection is not part of the graph.\n- The edge to replace does not exist.\n- Either `_from` or `_to` vertex does not exist.\n"
      },
      "412": {
       "content": {
@@ -19064,43 +18649,7 @@
         }
        }
       },
-      "description": "The graph cannot be found or the collection is not part of the graph.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "properties": {
-          "code": {
-           "description": "The HTTP response status code.\n",
-           "example": 410,
-           "type": "integer"
-          },
-          "error": {
-           "description": "A flag indicating that an error occurred.\n",
-           "example": true,
-           "type": "boolean"
-          },
-          "errorMessage": {
-           "description": "A descriptive error message.\n",
-           "type": "string"
-          },
-          "errorNum": {
-           "description": "The ArangoDB error number for the error that occurred.\n",
-           "type": "integer"
-          }
-         },
-         "required": [
-          "error",
-          "code",
-          "errorNum",
-          "errorMessage"
-         ],
-         "type": "object"
-        }
-       }
-      },
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "Returned if no graph with this name can be found.\nOr if a graph is found but this collection is not part of the graph.\n"
      }
     },
     "summary": "Create a vertex",
@@ -19367,43 +18916,7 @@
         }
        }
       },
-      "description": "Returned in the following cases:\n- The graph cannot be found.\n- The collection is not part of the graph.\n- The vertex to remove does not exist.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "properties": {
-          "code": {
-           "description": "The HTTP response status code.\n",
-           "example": 410,
-           "type": "integer"
-          },
-          "error": {
-           "description": "A flag indicating that an error occurred.\n",
-           "example": true,
-           "type": "boolean"
-          },
-          "errorMessage": {
-           "description": "A descriptive error message.\n",
-           "type": "string"
-          },
-          "errorNum": {
-           "description": "The ArangoDB error number for the error that occurred.\n",
-           "type": "integer"
-          }
-         },
-         "required": [
-          "error",
-          "code",
-          "errorNum",
-          "errorMessage"
-         ],
-         "type": "object"
-        }
-       }
-      },
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "Returned in the following cases:\n- No graph with this name can be found.\n- This collection is not part of the graph.\n- The vertex to remove does not exist.\n"
      },
      "412": {
       "content": {
@@ -19682,43 +19195,7 @@
         }
        }
       },
-      "description": "Returned in the following cases:\n- The graph cannot be found.\n- The collection is not part of the graph.\n- The vertex does not exist.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "properties": {
-          "code": {
-           "description": "The HTTP response status code.\n",
-           "example": 410,
-           "type": "integer"
-          },
-          "error": {
-           "description": "A flag indicating that an error occurred.\n",
-           "example": true,
-           "type": "boolean"
-          },
-          "errorMessage": {
-           "description": "A descriptive error message.\n",
-           "type": "string"
-          },
-          "errorNum": {
-           "description": "The ArangoDB error number for the error that occurred.\n",
-           "type": "integer"
-          }
-         },
-         "required": [
-          "error",
-          "code",
-          "errorNum",
-          "errorMessage"
-         ],
-         "type": "object"
-        }
-       }
-      },
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "Returned in the following cases:\n- No graph with this name could be found.\n- This collection is not part of the graph.\n- The vertex does not exist.\n"
      },
      "412": {
       "content": {
@@ -20139,43 +19616,7 @@
         }
        }
       },
-      "description": "Returned in the following cases:\n- The graph cannot be found.\n- The collection is not part of the graph.\n- The vertex to update does not exist.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "properties": {
-          "code": {
-           "description": "The HTTP response status code.\n",
-           "example": 410,
-           "type": "integer"
-          },
-          "error": {
-           "description": "A flag indicating that an error occurred.\n",
-           "example": true,
-           "type": "boolean"
-          },
-          "errorMessage": {
-           "description": "A descriptive error message.\n",
-           "type": "string"
-          },
-          "errorNum": {
-           "description": "The ArangoDB error number for the error that occurred.\n",
-           "type": "integer"
-          }
-         },
-         "required": [
-          "error",
-          "code",
-          "errorNum",
-          "errorMessage"
-         ],
-         "type": "object"
-        }
-       }
-      },
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "Returned in the following cases:\n- No graph with this name can be found.\n- This collection is not part of the graph.\n- The vertex to update does not exist.\n"
      },
      "412": {
       "content": {
@@ -20596,43 +20037,7 @@
         }
        }
       },
-      "description": "Returned in the following cases:\n- The graph cannot be found.\n- The collection is not part of the graph.\n- The vertex to replace does not exist.\n\nThis error also occurs if you try to run this operation as part of a\nStream Transaction but the transaction ID specified in the\n`x-arango-trx-id` header is unknown to the server.\n"
-     },
-     "410": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "properties": {
-          "code": {
-           "description": "The HTTP response status code.\n",
-           "example": 410,
-           "type": "integer"
-          },
-          "error": {
-           "description": "A flag indicating that an error occurred.\n",
-           "example": true,
-           "type": "boolean"
-          },
-          "errorMessage": {
-           "description": "A descriptive error message.\n",
-           "type": "string"
-          },
-          "errorNum": {
-           "description": "The ArangoDB error number for the error that occurred.\n",
-           "type": "integer"
-          }
-         },
-         "required": [
-          "error",
-          "code",
-          "errorNum",
-          "errorMessage"
-         ],
-         "type": "object"
-        }
-       }
-      },
-      "description": "This error occurs if you try to run this operation as part of a\nStream Transaction that has just been canceled or timed out.\n"
+      "description": "Returned in the following cases:\n- No graph with this name can be found.\n- This collection is not part of the graph.\n- The vertex to replace does not exist.\n"
      },
      "412": {
       "content": {
@@ -20747,17 +20152,11 @@
       }
      },
      {
-      "description": "Controls what action is carried out in case of a unique key constraint\nviolation.\n\n- `error`: this will not import the current document because of the unique\n  key constraint violation. This is the default setting.\n- `update`: this will update an existing document in the database with the\n  data specified in the request. Attributes of the existing document that\n  are not present in the request will be preserved.\n- `replace`: this will replace an existing document in the database with the\n  data specified in the request.\n- `ignore`: this will not update an existing document and simply ignore the\n  error caused by a unique key constraint violation.\n\nNote that `update`, `replace` and `ignore` will only work when the\nimport document in the request contains the `_key` attribute. `update` and\n`replace` may also fail because of secondary unique key constraint violations.\n",
+      "description": "Controls what action is carried out in case of a unique key constraint\nviolation. Possible values are:\n\n- `error`: this will not import the current document because of the unique\n  key constraint violation. This is the default setting.\n- `update`: this will update an existing document in the database with the\n  data specified in the request. Attributes of the existing document that\n  are not present in the request will be preserved.\n- `replace`: this will replace an existing document in the database with the\n  data specified in the request.\n- `ignore`: this will not update an existing document and simply ignore the\n  error caused by a unique key constraint violation.\n\nNote that `update`, `replace` and `ignore` will only work when the\nimport document in the request contains the `_key` attribute. `update` and\n`replace` may also fail because of secondary unique key constraint violations.\n",
       "in": "query",
       "name": "onDuplicate",
       "required": false,
       "schema": {
-       "enum": [
-        "error",
-        "update",
-        "replace",
-        "ignore"
-       ],
        "type": "string"
       }
      },
@@ -21029,7 +20428,7 @@
           "type": "string"
          },
          "type": {
-          "description": "Must be equal to `\"fulltext\"`.\n",
+          "description": "must be equal to `\"fulltext\"`.\n",
           "type": "string"
          }
         },
@@ -21114,7 +20513,7 @@
           "type": "string"
          },
          "type": {
-          "description": "Must be equal to `\"geo\"`.\n",
+          "description": "must be equal to `\"geo\"`.\n",
           "type": "string"
          }
         },
@@ -21225,18 +20624,11 @@
           "type": "object"
          },
          "features": {
-          "description": "A list of Analyzer features. You can set this option to overwrite what features\nare enabled for the default `analyzer`.\n\nDefault: the features as defined by the Analyzer itself.\n",
+          "description": "A list of Analyzer features. You can set this option to overwrite what features\nare enabled for the default `analyzer`. Possible features:\n- `\"frequency\"`\n- `\"norm\"`\n- `\"position\"`\n- `\"offset\"`\n\nDefault: the features as defined by the Analyzer itself.\n",
           "items": {
-           "enum": [
-            "frequency",
-            "norm",
-            "position",
-            "offset"
-           ],
            "type": "string"
           },
-          "type": "array",
-          "uniqueItems": true
+          "type": "array"
          },
          "fields": {
           "description": "An array of attribute paths. You can use strings to index the fields with the\ndefault options, or objects to specify options for the fields (with the\nattribute path in the `name` property), or a mix of both.\n",
@@ -21251,18 +20643,11 @@
              "type": "boolean"
             },
             "features": {
-             "description": "A list of Analyzer features to use for this field. You can set this option to\noverwrite what features are enabled for the `analyzer`.\n\nDefault: the features as defined by the Analyzer itself, or inherited from the\ntop-level `features` option if the `analyzer` option adjacent to this option is\nnot set.\n",
+             "description": "A list of Analyzer features to use for this field. You can set this option to\noverwrite what features are enabled for the `analyzer`. Possible features:\n- `\"frequency\"`\n- `\"norm\"`\n- `\"position\"`\n- `\"offset\"`\n\nDefault: the features as defined by the Analyzer itself, or inherited from the\ntop-level `features` option if the `analyzer` option adjacent to this option is\nnot set.\n",
              "items": {
-              "enum": [
-               "frequency",
-               "norm",
-               "position",
-               "offset"
-              ],
               "type": "string"
              },
-             "type": "array",
-             "uniqueItems": true
+             "type": "array"
             },
             "includeAllFields": {
              "description": "This option only applies if you use the inverted index in a `search-alias` Views.\n\nIf set to `true`, then all sub-attributes of this field are indexed, excluding\nany sub-attributes that are configured separately by other elements in the\n`fields` array (and their sub-attributes). The `analyzer` and `features`\nproperties apply to the sub-attributes.\n\nIf set to `false`, then sub-attributes are ignored.\n\nDefault: the value defined by the top-level `includeAllFields` option.\n",
@@ -21285,18 +20670,11 @@
                 "type": "boolean"
                },
                "features": {
-                "description": "A list of Analyzer features to use for this field. You can set this option to\noverwrite what features are enabled for the `analyzer`.\n\nDefault: the features as defined by the Analyzer itself, or inherited from the\nparent field's or top-level `features` option if no `analyzer` option is set\nat a deeper level, closer to this option.\n",
+                "description": "A list of Analyzer features to use for this field. You can set this option to\noverwrite what features are enabled for the `analyzer`. Possible features:\n- `\"frequency\"`\n- `\"norm\"`\n- `\"position\"`\n- `\"offset\"`\n\nDefault: the features as defined by the Analyzer itself, or inherited from the\nparent field's or top-level `features` option if no `analyzer` option is set\nat a deeper level, closer to this option.\n",
                 "items": {
-                 "enum": [
-                  "frequency",
-                  "norm",
-                  "position",
-                  "offset"
-                 ],
                  "type": "string"
                 },
-                "type": "array",
-                "uniqueItems": true
+                "type": "array"
                },
                "name": {
                 "description": "An attribute path. The `.` character denotes sub-attributes.\n",
@@ -21372,12 +20750,7 @@
             "type": "boolean"
            },
            "compression": {
-            "default": "lz4",
-            "description": "Defines how to compress the primary sort data.\n- `\"lz4\"`: use LZ4 fast compression.\n- `\"none\"`: disable compression to trade space for speed.\n",
-            "enum": [
-             "lz4",
-             "none"
-            ],
+            "description": "Defines how to compress the primary sort data. Possible values:\n- `\"lz4\"` (default): use LZ4 fast compression.\n- `\"none\"`: disable compression to trade space for speed.\n",
             "type": "string"
            },
            "fields": {
@@ -21385,11 +20758,7 @@
             "items": {
              "properties": {
               "direction": {
-               "description": "The sorting direction.\n- `\"asc` for ascending\n- `\"desc\"` for descending\n",
-               "enum": [
-                "asc",
-                "desc"
-               ],
+               "description": "The sorting direction. Possible values:\n- `\"asc` for ascending\n- `\"desc\"` for descending\n",
                "type": "string"
               },
               "field": {
@@ -21424,12 +20793,7 @@
              "type": "boolean"
             },
             "compression": {
-             "default": "lz4",
-             "description": "Defines how to compress the attribute values.\n- `\"lz4\"`: use LZ4 fast compression.\n- `\"none\"`: disable compression to trade space for speed.\n",
-             "enum": [
-              "lz4",
-              "none"
-             ],
+             "description": "Defines how to compress the attribute values. Possible values:\n- `\"lz4\"` (default): use LZ4 fast compression.\n- `\"none\"`: disable compression to trade space for speed.\n",
              "type": "string"
             },
             "fields": {
@@ -21530,7 +20894,7 @@
           "type": "boolean"
          },
          "fieldValueTypes": {
-          "description": "Must be equal to `\"double\"`. Currently only doubles are supported as values.\n",
+          "description": "must be equal to `\"double\"`. Currently only doubles are supported as values.\n",
           "type": "string"
          },
          "fields": {
@@ -21568,7 +20932,7 @@
           "type": "array"
          },
          "type": {
-          "description": "Must be equal to `\"mdi\"` or `\"mdi-prefixed\"`.\n",
+          "description": "must be equal to `\"mdi\"` or `\"mdi-prefixed\"`.\n",
           "type": "string"
          },
          "unique": {
@@ -21763,7 +21127,7 @@
           "type": "string"
          },
          "type": {
-          "description": "Must be equal to `\"ttl\"`.\n",
+          "description": "must be equal to `\"ttl\"`.\n",
           "type": "string"
          }
         },
@@ -22397,15 +21761,15 @@
            "example": [
             "traditional",
             "autoincrement",
-            "uuid",
-            "padded"
+            "padded",
+            "uuid"
            ],
            "items": {
             "enum": [
-             "traditional",
-             "autoincrement",
+             "padded",
              "uuid",
-             "padded"
+             "autoincrement",
+             "traditional"
             ],
             "type": "string"
            },
@@ -22468,7 +21832,7 @@
       "description": "If the query is valid, the server will respond with *HTTP 200* and\nreturn the names of the bind parameters it found in the query (if any) in\nthe `bindVars` attribute of the response. It will also return an array\nof the collections used in the query in the `collections` attribute.\nIf a query can be parsed successfully, the `ast` attribute of the returned\nJSON will contain the abstract syntax tree representation of the query.\nThe format of the `ast` is subject to change in future versions of\nArangoDB, but it can be used to inspect how ArangoDB interprets a given\nquery. Note that the abstract syntax tree will be returned without any\noptimizations applied to it.\n"
      },
      "400": {
-      "description": "The request is malformed or the query contains a parse error.\nThe body of the response contains the error details embedded in a JSON object.\n"
+      "description": "The server will respond with *HTTP 400* in case of a malformed request,\nor if the query contains a parse error. The body of the response will\ncontain the error details embedded in a JSON object.\n"
      }
     },
     "summary": "Parse an AQL query",
@@ -22495,33 +21859,10 @@
     ],
     "responses": {
      "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "properties": {
-          "code": {
-           "description": "The HTTP response status code.\n",
-           "example": 200,
-           "type": "integer"
-          },
-          "error": {
-           "description": "A flag indicating that no error occurred.\n",
-           "example": false,
-           "type": "boolean"
-          }
-         },
-         "required": [
-          "error",
-          "code"
-         ],
-         "type": "object"
-        }
-       }
-      },
-      "description": "The results cache has been cleared.\n"
+      "description": "The server will respond with *HTTP 200* when the cache was cleared\nsuccessfully.\n"
      },
      "400": {
-      "description": "The request is malformed.\n"
+      "description": "The server will respond with *HTTP 400* in case of a malformed request.\n"
      }
     },
     "summary": "Clear the AQL query results cache",
@@ -22532,7 +21873,7 @@
   },
   "/_db/{database-name}/_api/query-cache/entries": {
    "get": {
-    "description": "Returns an array containing the AQL query results currently stored in the query results\ncache of the selected database.\n",
+    "description": "Returns an array containing the AQL query results currently stored in the query results\ncache of the selected database. Each result is a JSON object with the following attributes:\n\n- `hash`: the query result's hash\n- `query`: the query string\n- `bindVars`: the query's bind parameters. this attribute is only shown if tracking for\n  bind variables was enabled at server start\n- `size`: the size of the query result and bind parameters, in bytes\n- `results`: number of documents/rows in the query result\n- `started`: the date and time when the query was stored in the cache\n- `hits`: number of times the result was served from the cache (can be\n  `0` for queries that were only stored in the cache but were never accessed\n  again afterwards)\n- `runTime`: the query's run time\n- `dataSources`: an array of collections/Views the query was using\n",
     "operationId": "listQueryCacheResults",
     "parameters": [
      {
@@ -22548,74 +21889,10 @@
     ],
     "responses": {
      "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "description": "The entries of the query results cache.\n",
-         "items": {
-          "description": "The properties of a cache entry.\n",
-          "properties": {
-           "bindVars": {
-            "description": "The bind parameters. This attribute is omitted if the\n`--query.tracking-with-bindvars` startup option is set\nto `false`.\n",
-            "type": "object"
-           },
-           "dataSources": {
-            "description": "The collections and Views involved in the query.\n",
-            "items": {
-             "type": "string"
-            },
-            "type": "array"
-           },
-           "hash": {
-            "description": "The hash value calculated from the the query string,\ncertain query options, and the bind variables.\n",
-            "type": "string"
-           },
-           "hits": {
-            "description": "How many times the result has been served from the cache so far.\n",
-            "type": "integer"
-           },
-           "query": {
-            "description": "The query string.\n",
-            "type": "string"
-           },
-           "results": {
-            "description": "The number of documents/rows in the query result.\n",
-            "type": "integer"
-           },
-           "runTime": {
-            "description": "The total duration of the query in seconds.\n",
-            "type": "number"
-           },
-           "size": {
-            "description": "The size of the query result and bind parameters (in bytes).\n",
-            "type": "integer"
-           },
-           "started": {
-            "description": "The date and time at which the query result has been added\nto the cache (in ISO 8601 format).\n",
-            "format": "date-time",
-            "type": "string"
-           }
-          },
-          "required": [
-           "hash",
-           "query",
-           "size",
-           "results",
-           "hits",
-           "runTime",
-           "started",
-           "dataSources"
-          ],
-          "type": "object"
-         },
-         "type": "array"
-        }
-       }
-      },
-      "description": "The list of cached query results.\n"
+      "description": "Is returned when the list of results can be retrieved successfully.\n"
      },
      "400": {
-      "description": "The request is malformed.\n"
+      "description": "The server will respond with *HTTP 400* in case of a malformed request,\n"
      }
     },
     "summary": "List the entries of the AQL query results cache",
@@ -22626,7 +21903,7 @@
   },
   "/_db/{database-name}/_api/query-cache/properties": {
    "get": {
-    "description": "Returns the global AQL query results cache configuration.\n",
+    "description": "Returns the global AQL query results cache configuration. The configuration is a\nJSON object with the following properties:\n\n- `mode`: the mode the AQL query results cache operates in. The mode is one of the following\n  values: `off`, `on`, or `demand`.\n\n- `maxResults`: the maximum number of query results that will be stored per database-specific\n  cache.\n\n- `maxResultsSize`: the maximum cumulated size of query results that will be stored per\n  database-specific cache.\n\n- `maxEntrySize`: the maximum individual result size of queries that will be stored per\n  database-specific cache.\n\n- `includeSystem`: whether or not results of queries that involve system collections will be\n  stored in the query results cache.\n",
     "operationId": "getQueryCacheProperties",
     "parameters": [
      {
@@ -22642,44 +21919,10 @@
     ],
     "responses": {
      "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "description": "The result cache configuration.\n",
-         "properties": {
-          "includeSystem": {
-           "description": "Whether results of queries that involve system collections\nare stored in the query results cache.\n",
-           "type": "boolean"
-          },
-          "maxEntrySize": {
-           "description": "The maximum individual result size of queries that are\nstored per database-specific cache (in bytes).\n"
-          },
-          "maxResults": {
-           "description": "The maximum number of query results that are stored per\ndatabase-specific cache.\n",
-           "type": "integer"
-          },
-          "maxResultsSize": {
-           "description": "The maximum cumulated size of query results that are\nstored per database-specific cache (in bytes).\n",
-           "type": "integer"
-          },
-          "mode": {
-           "description": "The mode the AQL query results cache operates in.\n",
-           "enum": [
-            "off",
-            "on",
-            "demand"
-           ],
-           "type": "string"
-          }
-         },
-         "type": "object"
-        }
-       }
-      },
-      "description": "The result cache configuration is returned successfully.\n"
+      "description": "Is returned if the properties can be retrieved successfully.\n"
      },
      "400": {
-      "description": "The request is malformed.\n"
+      "description": "The server will respond with *HTTP 400* in case of a malformed request,\n"
      }
     },
     "summary": "Get the AQL query results cache configuration",
@@ -22688,7 +21931,7 @@
     ]
    },
    "put": {
-    "description": "Adjusts the global properties for the AQL query results cache.\n\nChanging the properties may invalidate all results currently in the cache.\n",
+    "description": "Adjusts the global properties for the AQL query results cache.\n\nAfter the properties have been changed, the current set of properties will\nbe returned in the HTTP response.\n\nNote: changing the properties may invalidate all results in the cache.\n\nThe properties need to be passed in the `properties` attribute in the body\nof the HTTP request. `properties` needs to be a JSON object with the following\nproperties:\n",
     "operationId": "setQueryCacheProperties",
     "parameters": [
      {
@@ -22706,31 +21949,25 @@
      "content": {
       "application/json": {
        "schema": {
-        "description": "The result cache configuration settings to change.\n",
         "properties": {
          "includeSystem": {
-          "description": "Whether to store results of queries that involve\nsystem collections in the cache.\n",
+          "description": "whether or not to store results of queries that involve system collections.\n",
           "type": "boolean"
          },
          "maxEntrySize": {
-          "description": "The maximum individual size of query results that are stored\nper database-specific cache (in bytes).\n",
+          "description": "the maximum individual size of query results that will be stored per database-specific cache.\n",
           "type": "integer"
          },
          "maxResults": {
-          "description": "The maximum number of query results that are stored per\ndatabase-specific cache.\n",
+          "description": "the maximum number of query results that will be stored per database-specific cache.\n",
           "type": "integer"
          },
          "maxResultsSize": {
-          "description": "The maximum cumulated size of query results that are stored\nper database-specific cache (in bytes).\n",
+          "description": "the maximum cumulated size of query results that will be stored per database-specific cache.\n",
           "type": "integer"
          },
          "mode": {
-          "description": "The mode the AQL query cache shall operate in.\n",
-          "enum": [
-           "off",
-           "on",
-           "demand"
-          ],
+          "description": "the mode the AQL query cache should operate in. Possible values are `off`, `on`, or `demand`.\n",
           "type": "string"
          }
         },
@@ -22741,187 +21978,13 @@
     },
     "responses": {
      "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "description": "The result cache configuration.\n",
-         "properties": {
-          "includeSystem": {
-           "description": "Whether results of queries that involve system collections\nare stored in the query results cache.\n",
-           "type": "boolean"
-          },
-          "maxEntrySize": {
-           "description": "The maximum individual result size of queries that are\nstored per database-specific cache (in bytes).\n"
-          },
-          "maxResults": {
-           "description": "The maximum number of query results that are stored per\ndatabase-specific cache.\n",
-           "type": "integer"
-          },
-          "maxResultsSize": {
-           "description": "The maximum cumulated size of query results that are\nstored per database-specific cache (in bytes).\n",
-           "type": "integer"
-          },
-          "mode": {
-           "description": "The mode the AQL query results cache operates in.\n",
-           "enum": [
-            "off",
-            "on",
-            "demand"
-           ],
-           "type": "string"
-          }
-         },
-         "type": "object"
-        }
-       }
-      },
-      "description": "The result cache configuration has been changed successfully.\n"
+      "description": "Is returned if the properties were changed successfully.\n"
      },
      "400": {
-      "description": "The request is malformed.\n"
+      "description": "The server will respond with *HTTP 400* in case of a malformed request,\n"
      }
     },
     "summary": "Set the AQL query results cache configuration",
-    "tags": [
-     "Queries"
-    ]
-   }
-  },
-  "/_db/{database-name}/_api/query-plan-cache": {
-   "delete": {
-    "description": "Clears all execution plans stored in the AQL query plan cache for the\ncurrent database.\n\nThis requires write privileges for the current database.\n",
-    "operationId": "deleteAqlQueryPlanCache",
-    "parameters": [
-     {
-      "description": "The name of the database.\n",
-      "example": "_system",
-      "in": "path",
-      "name": "database-name",
-      "required": true,
-      "schema": {
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "properties": {
-          "code": {
-           "description": "The HTTP response status code.\n",
-           "example": 200,
-           "type": "integer"
-          },
-          "error": {
-           "description": "A flag indicating that no error occurred.\n",
-           "example": false,
-           "type": "boolean"
-          }
-         },
-         "required": [
-          "error",
-          "code"
-         ],
-         "type": "object"
-        }
-       }
-      },
-      "description": "The query plan cache has been cleared for the current database.\n"
-     }
-    },
-    "summary": "Clear the AQL query plan cache",
-    "tags": [
-     "Queries"
-    ]
-   },
-   "get": {
-    "description": "Returns an array containing information about each AQL execution plan\ncurrently stored in the cache of the selected database.\n\nThis requires read privileges for the current database. In addition, only those\nquery plans are returned for which the current user has at least read permissions\non all collections and Views included in the query.\n",
-    "operationId": "listQueryCachePlans",
-    "parameters": [
-     {
-      "description": "The name of the database.\n",
-      "example": "_system",
-      "in": "path",
-      "name": "database-name",
-      "required": true,
-      "schema": {
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "description": "The entries of the query plan cache.\n",
-         "items": {
-          "description": "The properties of a cache entry.\n",
-          "properties": {
-           "bindVars": {
-            "description": "A subset of the original bind parameters with only the\ncollection bind parameters (e.g. `@@coll`). They need to\nhave the same names and values for utilizing a cached plan.\n",
-            "type": "object"
-           },
-           "created": {
-            "description": "The date and time at which the query plan has been added\nto the cache (in ISO 8601 format).\n",
-            "format": "date-time",
-            "type": "string"
-           },
-           "dataSources": {
-            "description": "The collections and Views involved in the query.\n",
-            "items": {
-             "type": "string"
-            },
-            "type": "array"
-           },
-           "fullCount": {
-            "description": "The value of the `fullCount` query option in the\noriginal query. This option generally leads to different\nexecution plans.\n",
-            "type": "boolean"
-           },
-           "hash": {
-            "description": "The plan cache key.\n",
-            "type": "string"
-           },
-           "hits": {
-            "description": "How many times the cached plan has been utilized so far.\n",
-            "type": "integer"
-           },
-           "memoryUsage": {
-            "description": "How much memory the plan cache entry takes up for the\nexecution plan, query string, and so on (in bytes).\n",
-            "type": "integer"
-           },
-           "query": {
-            "description": "The query string.\n",
-            "type": "string"
-           },
-           "queryHash": {
-            "description": "The hash value of the query string.\n",
-            "type": "integer"
-           }
-          },
-          "required": [
-           "hash",
-           "query",
-           "queryHash",
-           "bindVars",
-           "fullCount",
-           "dataSources",
-           "created",
-           "hits",
-           "memoryUsage"
-          ],
-          "type": "object"
-         },
-         "type": "array"
-        }
-       }
-      },
-      "description": "The list of cached query plans.\n"
-     }
-    },
-    "summary": "List the entries of the AQL query plan cache",
     "tags": [
      "Queries"
     ]
@@ -22957,10 +22020,10 @@
       "description": "Is returned when the list of queries can be retrieved successfully.\n"
      },
      "400": {
-      "description": "The request is malformed.\n"
+      "description": "The server will respond with *HTTP 400* in case of a malformed request,\n"
      },
      "403": {
-      "description": "In case the `all` parameter is used but the request was made in a\ndifferent database than `_system`, or by a non-privileged user.\n"
+      "description": "*HTTP 403* is returned in case the `all` parameter was used, but the request\nwas made in a different database than _system, or by an non-privileged user.\n"
      }
     },
     "summary": "List the running AQL queries",
@@ -22990,7 +22053,7 @@
       "description": "Is returned if properties were retrieved successfully.\n"
      },
      "400": {
-      "description": "The request is malformed.\n"
+      "description": "The server will respond with *HTTP 400* in case of a malformed request,\n"
      }
     },
     "summary": "Get the AQL query tracking configuration",
@@ -23061,7 +22124,7 @@
       "description": "Is returned if the properties were changed successfully.\n"
      },
      "400": {
-      "description": "The request is malformed.\n"
+      "description": "The server will respond with *HTTP 400* in case of a malformed request,\n"
      }
     },
     "summary": "Update the AQL query tracking configuration",
@@ -23183,10 +22246,10 @@
     ],
     "responses": {
      "200": {
-      "description": "The list of queries has been cleared successfully.\n"
+      "description": "The server will respond with *HTTP 200* when the list of queries was\ncleared successfully.\n"
      },
      "400": {
-      "description": "The request is malformed.\n"
+      "description": "The server will respond with *HTTP 400* in case of a malformed request.\n"
      }
     },
     "summary": "Clear the list of slow AQL queries",
@@ -23223,10 +22286,10 @@
       "description": "Is returned when the list of queries can be retrieved successfully.\n"
      },
      "400": {
-      "description": "The request is malformed.\n"
+      "description": "The server will respond with *HTTP 400* in case of a malformed request,\n"
      },
      "403": {
-      "description": "In case the `all` parameter is used but the request was made in a\ndifferent database than `_system`, or by a non-privileged user.\n"
+      "description": "*HTTP 403* is returned in case the `all` parameter was used, but the request\nwas made in a different database than _system, or by an non-privileged user.\n"
      }
     },
     "summary": "List the slow AQL queries",
@@ -23251,7 +22314,7 @@
       }
      },
      {
-      "description": "The identifier of the query.\n",
+      "description": "The id of the query.\n",
       "in": "path",
       "name": "query-id",
       "required": true,
@@ -23271,16 +22334,16 @@
     ],
     "responses": {
      "200": {
-      "description": "The query was still running when the kill request was executed and\nthe query's kill flag has been set.\n"
+      "description": "The server will respond with *HTTP 200* when the query was still running when\nthe kill request was executed and the query's kill flag was set.\n"
      },
      "400": {
-      "description": "The request is malformed.\n"
+      "description": "The server will respond with *HTTP 400* in case of a malformed request.\n"
      },
      "403": {
-      "description": "In case the `all` parameter is used but the request was made in a\ndifferent database than `_system`, or by a non-privileged user.\n"
+      "description": "*HTTP 403* is returned in case the *all* parameter was used, but the request\nwas made in a different database than _system, or by an non-privileged user.\n"
      },
      "404": {
-      "description": "A query with the specified identifier cannot be found.\n"
+      "description": "The server will respond with *HTTP 404* when no query with the specified\nid was found.\n"
      }
     },
     "summary": "Kill a running AQL query",
@@ -26274,12 +25337,7 @@
              "type": "string"
             },
             "mode": {
-             "description": "The mode arangod runs in.\n",
-             "enum": [
-              "server",
-              "console",
-              "script"
-             ],
+             "description": "The mode arangod runs in. Possible values: `server`, `console`, `script`\n",
              "type": "string"
             },
             "openssl-version": {
@@ -26525,9 +25583,6 @@
             "type": "string"
            }
           },
-          "required": [
-           "type"
-          ],
           "type": "object"
          },
          "links": {
@@ -27705,14 +26760,17 @@
        "schema": {
         "properties": {
          "cleanupIntervalStep": {
+          "default": 2,
           "description": "Wait at least this many commits between removing unused files in the\nArangoSearch data directory (`0` = disable).\nFor the case where the consolidation policies merge segments often (i.e. a lot\nof commit+consolidate), a lower value causes a lot of disk space to be\nwasted.\nFor the case where the consolidation policies rarely merge segments (i.e. few\ninserts/deletes), a higher value impacts performance without any added\nbenefits.\n\n_Background:_\n  With every \"commit\" or \"consolidate\" operation, a new state of the View's\n  internal data structures is created on disk.\n  Old states/snapshots are released once there are no longer any users\n  remaining.\n  However, the files for the released states/snapshots are left on disk, and\n  only removed by \"cleanup\" operation.\n",
           "type": "integer"
          },
          "commitIntervalMsec": {
+          "default": 1000,
           "description": "Wait at least this many milliseconds between committing View data store\nchanges and making documents visible to queries (`0` = disable).\nFor the case where there are a lot of inserts/updates, a higher value causes the\nindex not to account for them and memory usage continues to grow until the commit.\nA lower value impacts performance, including the case where there are no or only a\nfew inserts/updates because of synchronous locking, and it wastes disk space for\neach commit call.\n\n_Background:_\n  For data retrieval, ArangoSearch follows the concept of\n  \"eventually-consistent\", i.e. eventually all the data in ArangoDB will be\n  matched by corresponding query expressions.\n  The concept of ArangoSearch \"commit\" operations is introduced to\n  control the upper-bound on the time until document addition/removals are\n  actually reflected by corresponding query expressions.\n  Once a \"commit\" operation is complete, all documents added/removed prior to\n  the start of the \"commit\" operation will be reflected by queries invoked in\n  subsequent ArangoDB transactions, in-progress ArangoDB transactions will\n  still continue to return a repeatable-read state.\n",
           "type": "integer"
          },
          "consolidationIntervalMsec": {
+          "default": 10000,
           "description": "Wait at least this many milliseconds between applying `consolidationPolicy` to\nconsolidate the View data store and possibly release space on the filesystem\n(`0` = disable).\nFor the case where there are a lot of data modification operations, a higher\nvalue could potentially have the data store consume more space and file handles.\nFor the case where there are a few data modification operations, a lower value\nimpacts performance due to no segment candidates being available for\nconsolidation.\n\n_Background:_\n  For data modification, ArangoSearch follows the concept of a\n  \"versioned data store\". Thus old versions of data may be removed once there\n  are no longer any users of the old data. The frequency of the cleanup and\n  compaction operations are governed by `consolidationIntervalMsec` and the\n  candidates for compaction are selected via `consolidationPolicy`.\n",
           "type": "integer"
          },
@@ -27752,6 +26810,7 @@
             "type": "number"
            },
            "type": {
+            "default": "tier",
             "description": "The segment candidates for the \"consolidation\" operation are selected based\nupon several possible configurable formulas as defined by their types.\nThe currently supported types are:\n- `\"tier\"`: consolidate based on segment byte size and live\n  document count as dictated by the customization attributes. \n- `\"bytes_accum\"`: consolidate if and only if\n  `{threshold} \u003e (segment_bytes + sum_of_merge_candidate_segment_bytes) / all_segment_bytes`\n  i.e. the sum of all candidate segment byte size is less than the total\n  segment byte size multiplied by the `{threshold}`.\n",
             "enum": [
              "tier",
@@ -27760,9 +26819,6 @@
             "type": "string"
            }
           },
-          "required": [
-           "type"
-          ],
           "type": "object"
          },
          "links": {
@@ -28134,9 +27190,6 @@
             "type": "string"
            }
           },
-          "required": [
-           "type"
-          ],
           "type": "object"
          },
          "links": {

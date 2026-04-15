@@ -27,6 +27,7 @@
 #include "Aql/ExecutionEngine.h"
 #include "Aql/ExecutionPlan.h"
 #include "Aql/Executor/IdExecutor.h"
+#include "Aql/RegisterPlan.h"
 
 #include <velocypack/Iterator.h>
 
@@ -75,7 +76,7 @@ ExecutionNode* SingletonNode::clone(ExecutionPlan* plan,
 
 /// @brief doToVelocyPack, for SingletonNode
 void SingletonNode::doToVelocyPack(velocypack::Builder& builder,
-                                   unsigned /*flags*/) const {
+                                   unsigned) const {
   builder.add(VPackValue("bindParameterVariables"));
   builder.openObject();
   for (auto const& [name, var] : _bindParameterOutVars) {

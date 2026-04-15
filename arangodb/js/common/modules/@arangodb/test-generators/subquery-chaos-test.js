@@ -27,9 +27,24 @@ const db = require("@arangodb").db;
 const _ = require("lodash");
 const {md5} = require("@arangodb/crypto");
 const arango = require("@arangodb").arango;
-const {randomNumberGeneratorInt} = require("@arangodb/testutils/seededRandom");
 
 const batchSize = 10;
+
+// This is a seedable RandomNumberGenerator
+// it is not operfect for Random numbers,
+// but good enough for what we are doing here
+function randomNumberGeneratorGenerator(seed) {
+  const rng = (function* (seed) {
+    while (true) {
+      const nextVal = Math.cos(seed++) * 10000;
+      yield nextVal - Math.floor(nextVal);
+    }
+  })(seed);
+
+  return function () {
+    return rng.next().value;
+  };
+}
 
 function coinToss(generator, bias) {
   if (typeof bias === "number") {
@@ -129,7 +144,7 @@ function* idGeneratorGenerator() {
 function createChaosQuery(seed, numberSubqueries) {
   let subqueryTotal = numberSubqueries;
   const idGenerator = idGeneratorGenerator();
-  const randomGenerator = randomNumberGeneratorInt(seed);
+  const randomGenerator = randomNumberGeneratorGenerator(seed);
   const collectionSize = 20;
 
   const query = function (indent, outerVariables) {
@@ -185,7 +200,7 @@ function createChaosQuery(seed, numberSubqueries) {
 function createModifyingChaosQuery(seed, numberSubqueries) {
   let subqueryTotal = numberSubqueries;
   const idGenerator = idGeneratorGenerator();
-  const randomGenerator = randomNumberGeneratorInt(seed);
+  const randomGenerator = randomNumberGeneratorGenerator(seed);
   const collectionSize = 20;
 
   const collectionIdGenerator = (function* () {
@@ -300,15 +315,9 @@ function runQuery(query, queryOptions, testOptions) {
   /* Create a simple hash value from the query results, so that we don't have to
    * load the entire result set into memory and work with it */
   let hash = "";
-  let count = 0;
   while (result.hasNext()) {
     let row = JSON.stringify(result.next());
-    hash = md5(hash + row);
-    // invoke cleanup
-    count += 1;
-    if (count % 5 === 0) {
-      require("internal").wait(0, true);
-    }
+    hash = md5(hash + row); 
   }
 
   /* Cleanup */
@@ -322,7 +331,7 @@ function runQuery(query, queryOptions, testOptions) {
 function testQuery(query, testOptions) {
   /* Print query string */
   if (testOptions.printQuery === true) {
-    console.log(`testing query: ${JSON.stringify(query.queryString)}`);
+    console.log(`testing query: ${query.queryString}`);
   }
 
   /* Run query with all optimizations */

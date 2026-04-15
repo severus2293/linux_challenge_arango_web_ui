@@ -1,7 +1,6 @@
 #!/bin/env python3
 """ the testing runner actually manages launching the processes, creating reports, etc. """
 from datetime import datetime
-import json
 import os
 from pathlib import Path
 import pprint
@@ -69,12 +68,10 @@ def zipp_this(filenames, target_dir):
 
 def testing_runner(testing_instance, this, arangosh):
     """operate one makedata instance"""
-    # pylint: disable=too-many-statements
     try:
         this.start = datetime.now(tz=None)
         ret = arangosh.run_testing(
             this.suite,
-            this.arangosh_args,
             this.args,
             15 * 60,  # 15 Minutes screen idle before timeout
             this.base_logdir,
@@ -91,7 +88,7 @@ def testing_runner(testing_instance, this, arangosh):
         this.finish = datetime.now(tz=None)
         this.delta = this.finish - this.start
         this.delta_seconds = this.delta.total_seconds()
-        logging.info("done with %s - %s", {this.name_enum} , str(ret["rc_exit"]))
+        logging.info("done with %s", {this.name_enum})
         this.crashed = (
             not this.crashed_file.exists() or this.crashed_file.read_text() == "true"
         )
@@ -139,8 +136,6 @@ def testing_runner(testing_instance, this, arangosh):
         this.delta_seconds = this.delta.total_seconds()
     finally:
         with arangosh.slot_lock:
-            with open((testing_instance.cfg.run_root / "job_to_pids.jsonl"), "a+", encoding="utf-8")  as jsonl_file:
-                jsonl_file.write(f'{json.dumps({"pid": ret["pid"], "logfile": str(this.log_file)})}\n')
             testing_instance.running_suites.remove(this.name_enum)
         testing_instance.done_job(this.parallelity)
 
@@ -317,7 +312,7 @@ class TestingRunner:
         used_slots = 0
         counter = 0
         if len(self.scenarios) == 0:
-            raise ValueError("no valid scenarios loaded")
+            raise Exception("no valid scenarios loaded")
         some_scenario = self.scenarios[0]
         if not some_scenario.base_logdir.exists():
             some_scenario.base_logdir.mkdir()
@@ -677,7 +672,6 @@ class TestingRunner:
                             "--testBuckets",
                             f"{num_buckets}/{i}",
                         ],
-                        test["arangosh_args"],
                         test["priority"],
                         parallelity,
                         test["flags"],
@@ -690,7 +684,6 @@ class TestingRunner:
                     name,
                     test["suite"],
                     [*args],
-                    test["arangosh_args"],
                     test["priority"],
                     parallelity,
                     test["flags"],

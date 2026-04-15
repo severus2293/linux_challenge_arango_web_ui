@@ -75,7 +75,7 @@ function BaseTestConfig () {
     },
 
     testCheckJobIndexes : function () {
-      let indexes = db._jobs.indexes();
+      let indexes = db._jobs.getIndexes();
       assertEqual(indexes.length, 3);
       indexes.forEach(idx => {
         switch(idx.type) {

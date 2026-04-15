@@ -61,7 +61,6 @@ class testRunner {
     if (isBucketized(options.testBuckets) && !didSplitBuckets) {
       throw new Error("You parametrized to split buckets, but this testsuite doesn't support it!!!");
     }
-    this.moreReason = "";
     this.addArgs = undefined;
     this.options = options;
     this.friendlyName = testname;
@@ -77,8 +76,6 @@ class testRunner {
     this.continueTesting = true;
     this.instanceManager = undefined;
     this.cleanupChecks = this.loadSutChecks(disableChecks);
-    this.checkTimeout = this.options.isInstrumented ? 120:60;
-    this.shellTimeout = arango.timeout();
   }
   loadSutChecks(disableCheckFilter) {
     let sutCheckers = _.filter(fs.list(fs.join(__dirname, 'sutcheckers')),
@@ -101,42 +98,6 @@ class testRunner {
       }
     });
     return ret;
-  }
-  checkSutCleannessBefore(te) {
-    arango.timeout(this.checkTimeout);
-    for (let j = 0; j < this.cleanupChecks.length; j++) {
-      if (!this.continueTesting || !this.cleanupChecks[j].setUp(te)) {
-        this.continueTesting = false;
-        print(RED + Date() + ' server pretest "' + this.cleanupChecks[j].name + '" failed!' + RESET);
-        this.moreReason += `server pretest '${this.cleanupChecks[j].name}' failed!`;
-        j = this.cleanupChecks.length;
-        continue;
-      }
-    }
-  }
-
-  checkSutCleannessAfter(te) {
-    let j = 0;
-    try {
-      arango.timeout(this.checkTimeout);
-      for (; j < this.cleanupChecks.length; j++) {
-        if (!this.continueTesting || !this.cleanupChecks[j].runCheck(te)) {
-          print(RED + Date() + ' server posttest "' + this.cleanupChecks[j].name + '" failed!' + RESET);
-          this.moreReason += `server posttest '${this.cleanupChecks[j].name}' failed!`;
-          this.continueTesting = false;
-          j = this.cleanupChecks.length;
-          continue;
-        }
-        arango.timeout(this.shellTimeout);
-      }
-    } catch(ex) {
-      arango.timeout(this.shellTimeout);
-      this.continueTesting = false;
-      print(`${RED}${Date()} server posttest "${this.cleanupChecks[j].name}" failed by throwing: ${ex}\n${ex.stack}!${RESET}`);
-      this.moreReason += `server posttest "${this.cleanupChecks[j].name}" failed by throwing: ${ex}`;
-      return false;
-    }
-    return true;
   }
   setResult(te, serverDead, res) {
     let orgRes = JSON.stringify(this.results[this.translateResult(te)]);
@@ -334,6 +295,9 @@ class testRunner {
     let serverDead = false;
     let count = 0;
     let forceTerminate = false;
+    let moreReason = "";
+    let shellTimeout = arango.timeout();
+    let checkTimeout = this.options.isInstrumented ? 120:60;
     for (let i = 0; i < this.testList.length; i++) {
       let te = this.testList[i];
       let filtered = {};
@@ -342,8 +306,18 @@ class testRunner {
         let first = true;
         let loopCount = 0;
         count += 1;
-        this.checkSutCleannessBefore(te);
-        arango.timeout(this.shellTimeout);
+        
+        arango.timeout(checkTimeout);
+        for (let j = 0; j < this.cleanupChecks.length; j++) {
+          if (!this.continueTesting || !this.cleanupChecks[j].setUp(te)) {
+            this.continueTesting = false;
+            print(RED + Date() + ' server pretest "' + this.cleanupChecks[j].name + '" failed!' + RESET);
+            moreReason += `server pretest '${this.cleanupChecks[j].name}' failed!`;
+            j = this.cleanupChecks.length;
+            continue;
+          }
+        }
+        arango.timeout(shellTimeout);
         while (first || this.options.loopEternal) {
           if (!this.continueTesting) {
             this.abortTestOnError(te);
@@ -357,7 +331,7 @@ class testRunner {
           print('\n' + (new Date()).toISOString() + GREEN + " [============] " + this.info + ': Trying', te, '... ' + count, RESET);
           let reply = this.runOneTest(te);
           if (reply.hasOwnProperty('forceTerminate') && reply.forceTerminate) {
-            this.moreReason += "test told us that we should forceTerminate.";
+            moreReason += "test told us that we should forceTerminate.";
             this.results[this.translateResult(te)] = reply;
             this.continueTesting = false;
             forceTerminate = true;
@@ -394,7 +368,24 @@ class testRunner {
             }
             this.results[this.translateResult(te)]['processStats']['netstat'] = this.instanceManager.getNetstat();
             this.continueTesting = true;
-            if (!this.checkSutCleannessAfter(te)) {
+            let j = 0;
+            try {
+              arango.timeout(checkTimeout);
+              for (; j < this.cleanupChecks.length; j++) {
+                if (!this.continueTesting || !this.cleanupChecks[j].runCheck(te)) {
+                  print(RED + Date() + ' server posttest "' + this.cleanupChecks[j].name + '" failed!' + RESET);
+                  moreReason += `server posttest '${this.cleanupChecks[j].name}' failed!`;
+                  this.continueTesting = false;
+                  j = this.cleanupChecks.length;
+                  continue;
+                }
+                arango.timeout(shellTimeout);
+              }
+            } catch(ex) {
+              arango.timeout(shellTimeout);
+              this.continueTesting = false;
+              print(`${RED}${Date()} server posttest "${this.cleanupChecks[j].name}" failed by throwing: ${ex}\n${ex.stack}!${RESET}`);
+              moreReason += `server posttest "${this.cleanupChecks[j].name}" failed by throwing: ${ex}`;
               continue;
             }
           } else {
@@ -465,7 +456,7 @@ class testRunner {
     if (this.serverOptions['server.jwt-secret'] && !clonedOpts['server.jwt-secret']) {
       clonedOpts['server.jwt-secret'] = this.serverOptions['server.jwt-secret'];
     }
-    this.results.shutdown = this.results.shutdown && this.instanceManager.shutdownInstance(forceTerminate, this.moreReason);
+    this.results.shutdown = this.results.shutdown && this.instanceManager.shutdownInstance(forceTerminate, moreReason);
     if (!this.results.shutdown) {
       this.results.status = false;
     }

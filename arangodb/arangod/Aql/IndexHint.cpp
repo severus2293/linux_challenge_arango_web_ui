@@ -170,10 +170,6 @@ IndexHint::IndexHint(QueryContext& query, AstNode const* node,
                                                   name);
           }
           handled = true;
-        } else if (name == StaticStrings::PushDownMaterialization) {
-          if (getBooleanValue(child, _pushDownMaterialization)) {
-            handled = true;
-          }
         } else {
           ExecutionPlan::invalidOptionAttribute(query, "unknown", "FOR", name);
           handled = true;

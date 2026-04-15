@@ -1,8 +1,9 @@
-import { InputControl, SingleSelectControl } from "@arangodb/ui";
 import { Box, Flex, Grid, Spacer } from "@chakra-ui/react";
 import { AnalyzerDescription } from "arangojs/analyzer";
 import { useField } from "formik";
 import React from "react";
+import { InputControl } from "../../../../components/form/InputControl";
+import { SelectControl } from "../../../../components/form/SelectControl";
 import { useAnalyzersContext } from "../../AnalyzersContext";
 import { ANALYZER_TYPE_OPTIONS } from "../../AnalyzersHelpers";
 import { AnalyzerTypeForm } from "../AnalyzerTypeForm";
@@ -40,7 +41,7 @@ const AnalyzerField = ({ name }: { name: string }) => {
   return (
     <Flex direction="column" gap="2" padding="2" backgroundColor="gray.100">
       <Grid templateColumns={"1fr 1fr"} columnGap="4">
-        <SingleSelectControl
+        <SelectControl
           isDisabled={isDisabled}
           name={`${name}.type`}
           label="Analyzer type"

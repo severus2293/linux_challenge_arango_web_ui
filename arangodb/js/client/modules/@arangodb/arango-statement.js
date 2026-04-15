@@ -119,20 +119,20 @@ ArangoStatement.prototype.explain = function (options) {
 
   arangosh.checkRequestResult(requestResult);
 
-  let result = {
-    warnings: requestResult.warnings,
-    stats: requestResult.stats,
-  };
   if (opts && opts.allPlans) {
-    result.plans = requestResult.plans;
+    return {
+      plans: requestResult.plans,
+      warnings: requestResult.warnings,
+      stats: requestResult.stats
+    };
   } else {
-    result.plan = requestResult.plan;
-    result.cacheable = requestResult.cacheable;
-    if (requestResult.hasOwnProperty("planCacheKey")) {
-      result.planCacheKey = requestResult.planCacheKey;
-    }
+    return {
+      plan: requestResult.plan,
+      warnings: requestResult.warnings,
+      stats: requestResult.stats,
+      cacheable: requestResult.cacheable
+    };
   }
-  return result;
 };
 
 // //////////////////////////////////////////////////////////////////////////////

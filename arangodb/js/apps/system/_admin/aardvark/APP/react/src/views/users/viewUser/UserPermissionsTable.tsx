@@ -1,6 +1,7 @@
-import { ReactTable, TableControl } from "@arangodb/ui";
 import { Alert, AlertDescription, AlertIcon, Stack } from "@chakra-ui/react";
 import React, { useEffect } from "react";
+import { ReactTable } from "../../../components/table/ReactTable";
+import { TableControl } from "../../../components/table/TableControl";
 import {
   CollectionsPermissionsTable,
   DatabaseTableType
@@ -8,6 +9,7 @@ import {
 import { SystemDatabaseWarningModal } from "./SystemDatabaseWarningModal";
 import { useUsername } from "./useFetchDatabasePermissions";
 import {
+  TABLE_COLUMNS,
   UserPermissionsContextProvider,
   useUserPermissionsContext
 } from "./UserPermissionsContext";
@@ -33,6 +35,7 @@ const UserPermissionsTableInner = () => {
     <Stack padding="4">
       <SystemDatabaseWarningModal />
       <TableControl<DatabaseTableType>
+        columns={TABLE_COLUMNS}
         table={tableInstance}
         showColumnSelector={false}
       />

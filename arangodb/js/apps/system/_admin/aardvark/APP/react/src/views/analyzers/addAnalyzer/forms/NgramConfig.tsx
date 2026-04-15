@@ -1,6 +1,7 @@
-import { InputControl, SingleSelectControl } from "@arangodb/ui";
 import { Grid } from "@chakra-ui/react";
 import React from "react";
+import { InputControl } from "../../../../components/form/InputControl";
+import { SelectControl } from "../../../../components/form/SelectControl";
 import { useAnalyzersContext } from "../../AnalyzersContext";
 import { NGramInputs } from "./inputs/NGramInputs";
 
@@ -23,7 +24,7 @@ export const NgramConfig = ({
         name={`${basePropertiesPath}.endMarker`}
         label="End Marker"
       />
-      <SingleSelectControl
+      <SelectControl
         isDisabled={isDisabled}
         selectProps={{
           options: [

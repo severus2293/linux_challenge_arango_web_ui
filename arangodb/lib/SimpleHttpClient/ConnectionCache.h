@@ -71,13 +71,10 @@ class ConnectionCache {
 
  public:
   struct Options {
-    explicit Options(size_t maxConnectionsPerEndpoint,
-                     uint32_t idleConnectionTimeout)
-        : maxConnectionsPerEndpoint(maxConnectionsPerEndpoint),
-          idleConnectionTimeout(idleConnectionTimeout) {}
+    explicit Options(size_t maxConnectionsPerEndpoint)
+        : maxConnectionsPerEndpoint(maxConnectionsPerEndpoint) {}
 
     size_t maxConnectionsPerEndpoint;
-    uint32_t idleConnectionTimeout = 120;  // seconds
   };
 
   ConnectionCache(application_features::CommunicationFeaturePhase& comm,
@@ -92,14 +89,10 @@ class ConnectionCache {
   void release(std::unique_ptr<GeneralClientConnection> connection,
                bool force = false);
 
-  struct ConnInfo {
-    std::unique_ptr<GeneralClientConnection> connection;
-    std::chrono::steady_clock::time_point lastUsed;
-  };
-
 #ifdef ARANGODB_USE_GOOGLE_TESTS
-  std::unordered_map<std::string, std::vector<ConnInfo>> const& connections()
-      const {
+  std::unordered_map<
+      std::string, std::vector<std::unique_ptr<GeneralClientConnection>>> const&
+  connections() const {
     return _connections;
   }
 #endif
@@ -111,7 +104,9 @@ class ConnectionCache {
 
   mutable std::mutex _lock;
 
-  std::unordered_map<std::string, std::vector<ConnInfo>> _connections;
+  std::unordered_map<std::string,
+                     std::vector<std::unique_ptr<GeneralClientConnection>>>
+      _connections;
 
   uint64_t _connectionsCreated;
   uint64_t _connectionsRecycled;

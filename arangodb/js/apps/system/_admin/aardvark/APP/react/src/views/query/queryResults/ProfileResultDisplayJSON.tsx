@@ -34,6 +34,7 @@ export const ProfileResultDisplayJSON = ({
             height: "calc(100% - 40px)"
           }
         }}
+        // @ts-ignore
         mainMenuBar={false}
       />
     </>

@@ -314,7 +314,7 @@ function BaseTestConfig () {
         function (state) {
           let col = db._collection(cn);
           assertNotNull(col, 'collection does not exist');
-          let idx = col.indexes();
+          let idx = col.getIndexes();
           assertEqual(2, idx.length);
           assertEqual('primary', idx[0].type);
           assertEqual('persistent', idx[1].type);
@@ -347,7 +347,7 @@ function BaseTestConfig () {
         },
 
         function (state) {
-          let idx = db._collection(cn).indexes();
+          let idx = db._collection(cn).getIndexes();
           assertEqual(1, idx.length);
           assertEqual('primary', idx[0].type);
         }
