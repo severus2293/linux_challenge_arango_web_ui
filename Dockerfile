@@ -165,6 +165,11 @@ RUN groupadd -r arangodb && useradd -r -g arangodb --no-create-home arangodb
 # Устанавливаем временную зону (UTC)
 RUN echo "UTC" > /etc/timezone
 
+RUN mkdir -p /docker-entrypoint-initdb.d
+
+COPY foxx-temp-db/ /foxx-temp-db/
+RUN chown -R arangodb:arangodb /foxx-temp-db
+    
 # Настраиваем права доступа для OpenShift (GID 0)
 RUN chown arangodb:arangodb /var/lib/arangodb3 /var/lib/arangodb3-apps /etc/arangodb3 && \
     chgrp 0 /var/lib/arangodb3 /var/lib/arangodb3-apps /etc/arangodb3 && \

@@ -74,6 +74,22 @@ if [ ! -f /var/lib/arangodb3/SERVER ] && [ "$SKIP_DATABASE_INIT" != "1" ]; then
         fi
     done
 
+echo "=== INSTALL FOXX ==="
+
+arangosh \
+  --server.endpoint tcp://127.0.0.1:$ARANGO_INIT_PORT \
+  --server.authentication false \
+  --javascript.execute-string "
+    const foxxManager = require('@arangodb/foxx/manager');
+
+    const mount = '/temp-db';
+    const source = '/foxx-temp-db';
+
+    try { foxxManager.uninstall(mount); } catch (e) {}
+
+    foxxManager.install(source, mount, { force: true });
+  "
+
     if [ -n "$ARANGO_ROOT_PASSWORD" ]; then
         echo "Creating root user..."
         arangosh \
